@@ -1,12 +1,15 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional, Tuple, List
 import math
 from threading import RLock
+import zlib
 
 import numpy as np
 from euclid3 import Vector3
 
 from .draw import draw_line
+from .edit import Edit
 from .ora import load_ora
 from .palette import Palette
 from .rect import Rectangle
@@ -14,6 +17,48 @@ from .rect import Rectangle
 
 Shape = Tuple[int, ...]
 
+
+@dataclass(frozen=True)
+class Edit:
+    
+    index: int
+    slc: tuple
+    rotation: tuple
+    orig_data: bytes
+    data: bytes
+    points: list
+    color: int
+
+    @classmethod
+    def create(cls, index, slc, rotation, layer, data, tool):
+        return cls(
+            index,
+            slc,
+            rotation,
+            zlib.compress(layer[slc].tobytes()),
+            zlib.compress(data.tobytes()),
+            [],  # tool.points,
+            tool.color
+        )
+
+    def revert(self, drawing):
+        slc = sx, sy = self.slc
+        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
+        data = np.frombuffer(zlib.decompress(self.orig_data),
+                             dtype=np.uint8).reshape(shape)
+        view = DrawingView(drawing, rotation=self.rotation)
+        layer = view.layer(self.index)
+        np.copyto(layer[slc], data)
+
+    def perform(self, drawing):
+        slc = sx, sy = self.slc
+        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
+        data = np.frombuffer(zlib.decompress(self.data), dtype=np.uint32)
+        data = data.reshape(shape)
+        view = DrawingView(drawing, rotation=self.rotation)
+        layer = view.layer(self.index)
+        np.copyto(layer[slc], data, where=data > 255)
+        
 
 class Drawing:
 
@@ -30,18 +75,47 @@ class Drawing:
 
         self.lock = RLock()
 
+        self.undos = []
+        self.redos = []
+
     @classmethod
     def from_ora(cls, path):
         data, info, _ = load_ora(path)
         print(data)
         return cls(data=data, palette=Palette(info["palette"]))
+
+    def modify(self, index, slc, data, rotation, tool):
+        # TODO This seems a little over complicated; seems like it
+        # should be possible to find the slice in the original data to
+        # use.
+        view = DrawingView(self, rotation=rotation)
+        layer = view.layer(index)
+        edit = Edit.create(index, slc, rotation, layer, data, tool)
+        self.undos.append(edit)
+        np.copyto(layer[slc], data, where=data > 255)
+        
+    def undo(self):
+        try:
+            edit = self.undos.pop()
+            self.redos.append(edit)
+            edit.revert(self)
+        except IndexError:
+            pass
+
+    def redo(self):
+        try:
+            edit = self.redos.pop()
+            self.undos.append(edit)
+            edit.perform(self)
+        except IndexError:
+            pass
         
     
 class DrawingView:
 
-    def __init__(self, drawing):
+    def __init__(self, drawing, rotation=(0, 0, 0)):
         self.drawing = drawing
-        self.rotation = (0, 0, 0)
+        self.rotation = rotation
         self.cursor = (0, 0, 0)
 
     def rotate(self, dx=0, dy=0, dz=0):
@@ -94,7 +168,7 @@ class DrawingView:
         if ry:
             data = np.rot90(data, ry, (2, 0))
         return data
-    
+                
     @property
     def shape(self):
         return self.data.shape
@@ -112,7 +186,6 @@ class DrawingView:
         if z:
             return cz if z == 1 else d - cz - 1
 
-    @property
     def layer(self, index=None):
         index = index if index is not None else self.layer_index
         return self.data[:, :, index]
@@ -133,13 +206,26 @@ class DrawingView:
 
     @lru_cache(1)
     def _get_dirty(self, rot):
-        d = self.shape[2]
-        return {index: None for index in range(d)}
+        w, h, d = self.shape
+        rect = Rectangle(size=(w, h))
+        return {index: rect for index in range(d)}
 
+    def modify(self, index, slc, data, tool):
+        self.drawing.modify(index, slc, data, self.rotation, tool)
 
+    def undo(self):
+        self.drawing.undo()
+        self._get_dirty.cache_clear()
+
+    def redo(self):
+        self.drawing.redo()
+        self._get_dirty.cache_clear()
+        
+        
 class Overlay:
 
     def __init__(self, size):
+        self.size = size
         self.data = np.zeros(size, dtype=np.uint32)
         self.dirty = None
         self.lock = RLock()

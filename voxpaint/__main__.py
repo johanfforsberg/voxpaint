@@ -48,12 +48,13 @@ MAX_ZOOM = 5
 
 class VoxpaintWindow(pyglet.window.Window):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, path=None, **kwargs):
         super().__init__(*args, **kwargs, resizable=True, vsync=False)
 
-        #self.drawing, info, data = load_ora("/home/jofo/pix/mina/oldpaint/voxelhus2.ora")
-        # self.drawing = Drawing.from_ora("/home/jofo/pix/mina/oldpaint/voxelhus2.ora")
-        self.drawing = Drawing((640, 480, 10), palette=Palette())
+        if path:
+            self.drawing = Drawing.from_ora(path)
+        else:
+            self.drawing = Drawing((128, 128, 128), palette=Palette())
         self.view = DrawingView(self.drawing)
 
         self.vao = VertexArrayObject()
@@ -120,9 +121,11 @@ class VoxpaintWindow(pyglet.window.Window):
         tool = stroke.result()
         if tool and tool.rect:
             s = tool.rect.as_slice()
-            src = self.view.overlay.data[s]
-            dst = self.view.layer[s]
-            np.copyto(dst, src, where=src > 255)
+            # src = self.view.overlay.data[s]
+            # dst = self.view.layer[s]
+            # print(dir(dst))
+            # np.copyto(dst, src, where=src > 255)
+            self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
             self.view.overlay.clear(tool.rect)
             self.view.dirty[self.view.layer_index] = tool.rect
         else:
@@ -183,6 +186,11 @@ class VoxpaintWindow(pyglet.window.Window):
             self.view.move_cursor(-x, -y, -z)
         print("cursor", self.view.cursor)
 
+        if symbol == key.Z:
+            self.view.undo()
+        if symbol == key.Y:
+            self.view.redo()
+        
         if symbol == key.U:
             plane = self.view.layer
             draw_line(plane, (0, 0), (10, 10), None, 1)
@@ -219,6 +227,10 @@ class VoxpaintWindow(pyglet.window.Window):
                 overlay.lock.release()
             
             for i in range(d):
+                # TODO This is pretty slow, since we draw every layer every frame.
+                # A better version would be to keep two extra fbs, one for the layers
+                # below and one above, and render all non-current layers to those.
+                # As long as no other layers are modified the fbs can be re-used.
                 tex = self._get_layer_texture(i, size)
                 dirty = self.view.dirty[i]
                 if dirty and self.drawing.lock.acquire(timeout=0.01):
@@ -347,9 +359,11 @@ class OldpaintEventLoop(pyglet.app.EventLoop):
     
 if __name__ == "__main__":
 
+    import sys
+    
     gl_config = pyglet.gl.Config(major_version=4, minor_version=5,  # Minimum OpenGL requirement
                                  double_buffer=False)  # Double buffering gives noticable cursor lag
 
-    VoxpaintWindow(config=gl_config)
+    VoxpaintWindow(config=gl_config, path=sys.argv[1])
     pyglet.app.event_loop = OldpaintEventLoop()
     pyglet.app.run(0.02)
