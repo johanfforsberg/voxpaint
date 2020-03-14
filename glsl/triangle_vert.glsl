@@ -1,0 +1,10 @@
+#version 450 core
+
+layout (location = 0) in vec4 position;
+
+layout (location = 0) uniform mat4 proj_matrix;
+
+
+void main() {
+  gl_Position = proj_matrix * position;
+}
