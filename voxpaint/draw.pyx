@@ -31,9 +31,44 @@ cpdef void paste(unsigned int [:, :] pic, unsigned int [:, :] brush, int x, int 
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.        
-cpdef void blit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y) nogil:
+cpdef Rectangle blit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y):
     "Draw a brush onto an image, skipping transparent pixels."
-    cdef int w, h, bw, bh, y1, x1, x2, y2, offset1, offset2
+    cdef int w, h, bw, bh, y1, x1, x2, y2, xmin, ymin, xmax, ymax
+    w, h = pic.shape[:2]
+    bw, bh = brush.shape[:2]
+    xmin = w
+    ymin = h
+    xmax = 0
+    ymax = 0
+    with nogil:
+        for y1 in range(bh):
+            y2 = y + y1
+            if (y2 < 0):
+                continue
+            if (y2 >= h):
+                break
+            for x1 in range(bw):
+                x2 = x + x1
+                if (x2 < 0):
+                    continue
+                if (x2 >= w):
+                    break
+                if brush[x1, y1] >> 24:  # Ignore 100% transparent pixels
+                    pic[x2, y2] = brush[x1, y1]
+                    # TODO I think this can be done in a smarter way.
+                    xmin = min(xmin, x2)
+                    xmax = max(xmax, x2)
+                    ymin = min(ymin, y2)
+                    ymax = max(ymax, y2)
+    return Rectangle((xmin, ymin), (xmax - xmin + 1, ymax - ymin + 1))
+
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.        
+cdef void cblit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y) nogil:
+    "Draw a brush onto an image, skipping transparent pixels."
+    # Faster version for internal use in this module.
+    cdef int w, h, bw, bh, y1, x1, x2, y2
     w, h = pic.shape[:2]
     bw, bh = brush.shape[:2]
     for y1 in range(bh):
@@ -50,6 +85,7 @@ cpdef void blit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y) 
                 break
             if brush[x1, y1] >> 24:  # Ignore 100% transparent pixels
                 pic[x2, y2] = brush[x1, y1]
+
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
@@ -76,11 +112,12 @@ cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
 
     cdef int px0, px1, py0, py1, bx0, bx1, by0, by1
     cdef unsigned int[:, :] src, dst
+    cdef Rectangle r
 
     with nogil:
         while True:
             if i % step == 0:
-                blit(pic, brush, x, y)
+                cblit(pic, brush, x, y)
             if x == x1 and y == y1:
                 break
             e2 = 2*err

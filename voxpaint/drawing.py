@@ -6,7 +6,7 @@ from threading import RLock
 import numpy as np
 from euclid3 import Vector3
 
-from .draw import draw_line
+from .draw import draw_line, blit
 from .edit import Edit
 from .ora import load_ora
 from .palette import Palette
@@ -37,7 +37,6 @@ class Drawing:
     @classmethod
     def from_ora(cls, path):
         data, info, _ = load_ora(path)
-        print(data)
         return cls(data=data, palette=Palette(info["palette"]))
 
     def modify(self, index, slc, data, rotation, tool):
@@ -198,29 +197,37 @@ class Overlay:
     def __init__(self, size):
         self.size = size
         self.data = np.zeros(size, dtype=np.uint32)
-        self.dirty = None
         self.lock = RLock()
-        self.brush_preview_dirty = None
+        self.rect = Rectangle((0, 0), size)
+        
+        self.dirty = None
 
-    def clear(self, rect=None):
+    def clear_all(self):
+        self.clear(self.rect)
+        
+    def clear(self, rect):
+        rect = self.rect.intersect(rect)
         if rect:
             x0, y0, x1, y1 = rect.box()
-        else:
-            x0, y0, x1, y1 = 0, 0, *self.size
-            rect = Rectangle((x0, y0), (x1-x0, y1-y0))
-        self.data[x0:x1, y0:y1] = 0
-        self.dirty = rect.unite(self.dirty)
+            with self.lock:
+                self.data[x0:x1, y0:y1] = 0
+            self.dirty = rect.unite(self.dirty)
+        return rect
 
-    def blit(self, data, rect):
-        #self.data[rect.as_slice()] = data
-        #self.dirty = rect.unite(self.dirty)
-        pass
+    def blit(self, brush, p, color=0):
+        x, y = p
+        data = brush.get_draw_data(color)
+        with self.lock:
+            rect = blit(self.data, data, x, y)
+        self.dirty = rect.unite(self.dirty)
+        return rect
         
     def draw_line(self, brush, p0, p1, color=0):
         x0, y0 = p0
         x1, y1 = p1
         dx, dy = brush.center
         data = brush.get_draw_data(color)
-        rect = draw_line(self.data, (x0-dx, y0-dy), (x1-dx, y1-dy), data)
+        with self.lock:
+            rect = draw_line(self.data, (x0-dx, y0-dy), (x1-dx, y1-dy), data)
         self.dirty = rect.unite(self.dirty)
         return rect
