@@ -190,8 +190,8 @@ class EllipseTool(Tool):
         x, y = point
         size = (int(abs(x - x0)), int(abs(y - y0)))
         self.rect = view.overlay.draw_ellipse((x0, y0), size, brush=self.brush.get_pic(self.brush_color),
-                                         offset=self.brush.center, color=self.color + 255*2**24,
-                                         fill=modifiers & window.key.MOD_SHIFT)
+                                              offset=self.brush.center, color=self.color + 255*2**24,
+                                              fill=modifiers & window.key.MOD_SHIFT)
         self.points.append(point)
 
     def __repr__(self):
@@ -244,7 +244,7 @@ class SelectionTool(Tool):
 
 class PickerTool(Tool):
 
-    "Set the current color to the one under the mouse when clicked."
+    "Set the current color/alayer to the one under the mouse when clicked."
 
     tool = ToolName.picker
     brush_preview = False
@@ -254,13 +254,31 @@ class PickerTool(Tool):
         self.color = None
 
     def finish(self, view, point, buttons, modifiers):
-        # Find the pixel that is visible at the given point.
-        for layer in reversed(list(view.layers)):
-            index = layer[point]
-            if index != 0:
-                break
-            
-        if buttons == window.mouse.LEFT:
-            self.drawing.palette.foreground = index
-        elif buttons == window.mouse.RIGHT:
-            self.drawing.palette.background = index
+        if window.key.MOD_SHIFT:
+            # Find the layer under the cursor
+            for i, layer in enumerate(reversed(list(view.layers))):
+                color = layer[point]
+                if color != 0:
+                    break
+            else:
+                return
+            # TODO too tired to figure this out properly, do that :)
+            x, y, z = view.direction
+            sign = sum(view.direction)
+            d = view.shape[2]
+            if sign > 0:
+                view.set_cursor(d - (x*i) - 1, d - (y*i) - 1, d - (z*i) - 1)
+            else:
+                view.set_cursor(-(x*i), -(y*i), -(z*i))
+        else:
+            # Pick color
+            for layer in reversed(list(view.layers)):
+                color = layer[point]
+                if color != 0:
+                    break
+
+            if buttons == window.mouse.LEFT:
+                self.drawing.palette.foreground = color
+            elif buttons == window.mouse.RIGHT:
+                self.drawing.palette.background = color
+                
