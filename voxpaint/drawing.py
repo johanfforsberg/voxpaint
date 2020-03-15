@@ -4,11 +4,12 @@ import math
 from threading import RLock
 
 import numpy as np
-from euclid3 import Vector3
+from euclid3 import Vector3, Matrix4
 
+from .brush import Brush
 from .draw import blit, draw_line, draw_rectangle
 from .edit import Edit
-from .ora import load_ora
+from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
 
@@ -34,11 +35,36 @@ class Drawing:
         self.undos = []
         self.redos = []
 
+        self.plugins = {}
+
+        self.version = 0
+
+    @property
+    def size(self):
+        return self.data.shape[:2]
+
+    @property
+    def rect(self):
+        return self._get_rect(self.data.shape)
+
+    @lru_cache(1)
+    def _get_rect(self, shape):
+        return Rectangle((0, 0), shape[:2])
+
     @classmethod
     def from_ora(cls, path):
         data, info, _ = load_ora(path)
         return cls(data=data, palette=Palette(info["palette"]))
 
+    def to_ora(self, path):
+        view = self.get_view()
+        layers = list(view.layers)
+        save_ora(self.size, layers, self.palette, path)
+
+    @property
+    def layers(self):
+        return [self.data[:, :, i] for i in range(self.data.shape[2])]
+        
     def modify(self, index, slc, data, rotation, tool):
         # TODO This seems a little over complicated; seems like it
         # should be possible to find the slice in the original data to
@@ -49,12 +75,14 @@ class Drawing:
         self.undos.append(edit)
         np.copyto(layer[slc], data, where=data > 255)
         self.redos.clear()
+        self.version += 1
         
     def undo(self):
         try:
             edit = self.undos.pop()
             self.redos.append(edit)
             edit.revert(self)
+            self.version += 1
         except IndexError:
             pass
 
@@ -63,11 +91,15 @@ class Drawing:
             edit = self.redos.pop()
             self.undos.append(edit)
             edit.perform(self)
+            self.version += 1
         except IndexError:
             pass
 
-    def get_view(self, rotation):
+    def get_view(self, rotation=(0, 0, 0)):
         return DrawingView(self, rotation)
+
+    def __hash__(self):
+        return hash((id(self), self.data.shape, self.version))
         
     
 class DrawingView:
@@ -76,6 +108,7 @@ class DrawingView:
         self.drawing = drawing
         self.rotation = rotation
         self.cursor = (0, 0, 0)
+        self.brushes = []
 
     def rotate(self, dx=0, dy=0, dz=0):
         pitch, yaw, roll = self.rotation
@@ -87,6 +120,12 @@ class DrawingView:
         self.cursor = (min(w-1, max(0, x + dx)),
                        min(h-1, max(0, y + dy)),
                        min(d-1, max(0, z + dz)))
+
+    def set_cursor(self, x=None, y=None, z=None):
+        x0, y0, z0 = self.cursor
+        self.cursor = (x if x is not None else x0,
+                       y if y is not None else y0,
+                       z if z is not None else z0)
         
     @property
     def data(self):
@@ -197,13 +236,24 @@ class DrawingView:
         x, y, z = self.direction
         self.move_cursor(-x, -y, -z)
 
-    def move_layer_up(self):
+    def move_layer(self, d):
         index = self.layer_index
+        other_index = index + d
+        print(index, other_index, self.shape)
+        if not 0 <= other_index < self.shape[2]:
+            return
         current_layer = self.layer()
-        above_layer = self.layer(index + 1).copy()
+        above_layer = self.layer(index + d).copy()
+        self.data[:, :, index + d] = current_layer
         self.data[:, :, index] = above_layer
-        self.data[:, :, index + 1] = current_layer
-        self.move_cursor(dz=1)
+        deltas = [d * a for a in self.direction]
+        self.move_cursor(*deltas)
+        self.drawing.version += 1
+
+    def make_brush(self, rect=None):
+        data = self.layer().copy()
+        brush = Brush(data=data)
+        self.brushes.append(brush)
         
         
 class Overlay:
@@ -257,7 +307,8 @@ class Overlay:
         data = brush.get_draw_data(color)
         with self.lock:
             rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
-        self.dirty = rect.unite(self.dirty)
+        if rect:
+            self.dirty = rect.unite(self.dirty)
         return rect
     
     def draw_ellipse(self, brush, pos, size, color=0, fill=False):

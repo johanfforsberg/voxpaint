@@ -41,7 +41,7 @@ def make_stroke(view, event_queue, tool):
             # with layer.lock:
             # By taking the lock here we can prevent flickering.
             if tool.ephemeral and tool.rect:
-                overlay.clear(tool.rect)
+                view.overlay.clear(tool.rect)
             tool.draw(view, *args)
         elif event_type == "mouse_up":
             print("done")

@@ -6,6 +6,7 @@ from queue import Queue
 import pyximport
 pyximport.install(language_level=3)  # Setup cython to autocompile pyx modules
 
+import imgui
 import numpy as np
 import pyglet
 from pyglet import gl
@@ -13,7 +14,8 @@ from pyglet.window import key
 
 from fogl.framebuffer import FrameBuffer
 from fogl.shader import Program, VertexShader, FragmentShader
-from fogl.texture import Texture, ByteTexture
+from fogl.texture import Texture, ByteTexture, ImageTexture
+from fogl.util import load_png
 from fogl.vao import VertexArrayObject
 from fogl.vertex import SimpleVertices
 
@@ -21,14 +23,17 @@ from .brush import Brush
 from .constants import ToolName
 from .drawing import Drawing, DrawingView
 from .draw import draw_line
+from .imgui_pyglet import PygletRenderer
 from .palette import Palette
+from .plugin import init_plugins, render_plugins_ui
 from .rect import Rectangle
 from .stroke import make_stroke
 from .texture import IntegerTexture, ByteIntegerTexture
 from .tool import (PencilTool, PointsTool, SprayTool,
                    LineTool, RectangleTool, EllipseTool,
                    SelectionTool, PickerTool, FillTool)
-from .util import make_view_matrix, try_except_log, Selectable, Selectable2
+from . import ui
+from .util import make_view_matrix, try_except_log, Selectable, Selectable2, no_imgui_events
 
 
 vao = VertexArrayObject()
@@ -61,7 +66,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.drawing = Drawing.from_ora(path)
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
-            self.drawing = Drawing((128, 128, 128), palette=Palette())
+            self.drawing = Drawing((32, 32, 32), palette=Palette())
         self.view = DrawingView(self.drawing)
 
         self.vao = VertexArrayObject()
@@ -90,12 +95,29 @@ class VoxpaintWindow(pyglet.window.Window):
                 PickerTool
             ]
         })
-        self.brush = Brush((1, 1))
+        self._brush = Brush((1, 1))
         self.stroke = None
 
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.mouse_event_queue = None
 
+        self.imgui_renderer = PygletRenderer(self)
+        io = imgui.get_io()
+        self._font = io.fonts.add_font_from_file_ttf(
+            "ttf/Topaznew.ttf", 16, io.fonts.get_glyph_ranges_latin()
+        )
+        self.imgui_renderer.refresh_font_texture()
+        
+        self.icons = {
+            name: ImageTexture(*load_png(f"icons/{name}.png"))
+            for name in ["brush", "ellipse", "floodfill", "line", "spray",
+                         "pencil", "picker", "points", "rectangle"]
+        }
+
+        self.plugins = {}
+        init_plugins(self)
+        self.drawing.plugins = self.plugins
+        
     @property
     def tool(self):
         return self.tools.current
@@ -103,8 +125,12 @@ class VoxpaintWindow(pyglet.window.Window):
     @property
     def overlay(self):
         return self.view.overlay
+
+    @property
+    def brush(self):
+        return self.view.brushes[-1] if self.view.brushes else self._brush
     
-    # @no_imgui_events
+    @no_imgui_events
     def on_mouse_press(self, x, y, button, modifiers):
         if not self.drawing:
             return
@@ -172,7 +198,7 @@ class VoxpaintWindow(pyglet.window.Window):
         # self.autosave_drawing()
         print("Stroke finished")
         
-    # @no_imgui_events
+    @no_imgui_events
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         "Callback for mouse movement with buttons held"
         if self.stroke:
@@ -186,7 +212,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.offset = ox + dx, oy + dy
             self._to_image_coords.cache_clear()
             
-    # @no_imgui_events
+    @no_imgui_events
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
         if self.keys[key.LSHIFT]:
             if scroll_y > 0:
@@ -206,38 +232,56 @@ class VoxpaintWindow(pyglet.window.Window):
 
         if symbol == key.LEFT:
             self.view.rotate(dz=-1)
-        if symbol == key.RIGHT:
+        elif symbol == key.RIGHT:
             self.view.rotate(dz=1)
-        if symbol == key.UP:
+        elif symbol == key.UP:
             self.view.rotate(dx=-1)
-        if symbol == key.DOWN:
+        elif symbol == key.DOWN:
             self.view.rotate(dx=1)
-        print("direction", self.view.direction)
         
-        if symbol == key.W:
+        elif symbol == key.W:
             if modifiers & key.MOD_SHIFT:
-                self.view.move_layer_up()
+                self.view.move_layer(1)
             else:
                 self.view.next_layer()
-        if symbol == key.S:
-            self.view.prev_layer()
-        print("cursor", self.view.cursor)
-
-        if symbol == key.P:
-            self.tools.select(ToolName.pencil)
-        if symbol == key.L:
-            self.tools.select(ToolName.line)
-        if symbol == key.F:
-            self.tools.select(ToolName.floodfill)
-        if symbol == key.I:
-            self.tools.select(ToolName.picker)
+        elif symbol == key.S:
+            if modifiers & key.MOD_SHIFT:
+                self.view.move_layer(-1)
+            elif modifiers & key.MOD_CTRL:
+                self.drawing.to_ora("/tmp/hej.ora")
+            else:
+                self.view.prev_layer()
             
-        if symbol == key.Z:
+        elif symbol == key.P:
+            self.tools.select(ToolName.pencil)
+        elif symbol == key.L:
+            self.tools.select(ToolName.line)
+        elif symbol == key.F:
+            self.tools.select(ToolName.floodfill)
+        elif symbol == key.R:
+            self.tools.select(ToolName.rectangle)
+        elif symbol == key.I:
+            self.tools.select(ToolName.picker)
+
+        elif symbol == key.B:
+            if modifiers & key.MOD_SHIFT:
+                self.view.brushes.clear()
+            else:
+                self.view.make_brush()
+            
+        elif symbol == key.Z:
             self.view.undo()
-        if symbol == key.Y:
+        elif symbol == key.Y:
             self.view.redo()
-                
+
+        elif symbol == key.F4:
+            init_plugins(self)
+            
     def on_draw(self):
+        self._render_view()
+        self._render_gui()
+
+    def _render_view(self):
         # gl.glClear(gl.GL_COLOR_BUFFER_BIT)
         gl.glClearBufferfv(gl.GL_COLOR, 0, (gl.GLfloat * 4)(0.25, 0.25, 0.25, 1))
         data = self.view.data
@@ -317,7 +361,21 @@ class VoxpaintWindow(pyglet.window.Window):
             gl.glLineWidth(1)
             gl.glDrawArrays(gl.GL_LINE_LOOP, 0, 4)
 
-                
+    def _render_gui(self):
+        w, h = self.get_size()
+        
+        imgui.new_frame()
+        with imgui.font(self._font):
+            ui.render_palette_popup(self.drawing)
+            ui.render_layers(self.view)
+            render_plugins_ui(self)
+            
+        imgui.render()
+        imgui.end_frame()
+        self.imgui_renderer.render(imgui.get_draw_data())
+
+        
+        
     @lru_cache(1)
     def _to_image_coords(self, x, y):
         "Convert window coordinates to image coordinates."

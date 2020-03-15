@@ -16,25 +16,32 @@ import png
 # from .picture import LongPicture, load_png, save_png
 
 
-# def save_ora(size: Tuple[int, int], layers: List[LongPicture], palette, path, **kwargs):
-#     w, h = size
-#     image_el = ET.Element("image", version="0.0.3", w=str(w), h=str(h))
-#     stack_el = ET.SubElement(image_el, "stack")
-#     for i, layer in enumerate(reversed(layers), 1):
-#         ET.SubElement(stack_el, "layer", name=f"layer{i}", src=f"data/layer{i}.png")
-#     stack_xml = b"<?xml version='1.0' encoding='UTF-8'?>" + ET.tostring(image_el)
+def save_png(data, dest, palette=None):
+    w, h = data.shape
+    writer = png.Writer(w, h, bitdepth=8, alpha=False, palette=palette)
+    rows = (data[:, i].tobytes() for i in range(data.shape[1]))
+    writer.write(dest, rows)
 
-#     with zipfile.ZipFile(path, mode="w", compression=zipfile.ZIP_DEFLATED) as orafile:
-#         orafile.writestr("mimetype", "image/openraster", compress_type=zipfile.ZIP_STORED)
-#         orafile.writestr("stack.xml", stack_xml)
-#         for i, layer in enumerate(reversed(layers), 1):
-#             with io.BytesIO() as f:
-#                 save_png(layer.pic, f, palette=palette.colors)
-#                 f.seek(0)
-#                 orafile.writestr(f"data/layer{i}.png", f.read())
 
-#         # Other data
-#         orafile.writestr("oldpaint.json", json.dumps(kwargs))
+def save_ora(size: Tuple[int, int], layers: List[np.ndarray], palette, path, **kwargs):
+    w, h = size
+    d = len(layers)
+    image_el = ET.Element("image", version="0.0.3", w=str(w), h=str(h))
+    stack_el = ET.SubElement(image_el, "stack")
+    for i, layer in enumerate(reversed(layers), 1):
+        ET.SubElement(stack_el, "layer", name=f"layer{i}", src=f"data/layer{d - i}.png")
+    stack_xml = b"<?xml version='1.0' encoding='UTF-8'?>" + ET.tostring(image_el)
+    with zipfile.ZipFile(path, mode="w", compression=zipfile.ZIP_DEFLATED) as orafile:
+        orafile.writestr("mimetype", "image/openraster", compress_type=zipfile.ZIP_STORED)
+        orafile.writestr("stack.xml", stack_xml)
+        for i, layer in enumerate(reversed(layers), 1):
+            with io.BytesIO() as f:
+                save_png(layer, f, palette=palette.colors)
+                f.seek(0)
+                orafile.writestr(f"data/layer{d - i}.png", f.read())
+
+        # Other data
+        orafile.writestr("oldpaint.json", json.dumps(kwargs))
                 
 
 def load_ora(path):

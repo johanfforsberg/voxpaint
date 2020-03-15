@@ -5,6 +5,7 @@ from tkinter import Tk, filedialog
 from traceback import format_exc
 
 from euclid3 import Matrix4
+import imgui
 import pyglet
 
 
@@ -240,3 +241,12 @@ def show_load_dialog(**args):
 def show_save_dialog(**args):
     Tk().withdraw()
     return filedialog.asksaveasfilename(**args)
+
+
+def no_imgui_events(f):
+    "Decorator for event callbacks that should ignore events on imgui windows."
+    def inner(*args):
+        io = imgui.get_io()
+        if not (io.want_capture_mouse or io.want_capture_keyboard):
+            f(*args)
+    return inner

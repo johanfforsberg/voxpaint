@@ -162,8 +162,9 @@ cpdef draw_rectangle(unsigned int [:, :] pic, unsigned int [:, :] brush,
         draw_line(pic, brush, (x0, y0+h0), pos)   
 
     bw, bh = brush.shape[:2]
-        
-    return Rectangle((x, y), (min(cols, w + bw), min(rows, h + bh)))
+
+    cdef Rectangle pic_rect = Rectangle((0, 0), (cols, rows))
+    return pic_rect.intersect(Rectangle((x, y), (min(cols, w + bw), min(rows, h + bh))))
 
 
 # cpdef draw_ellipse(LongPicture pic, (int, int) center, (int, int) size, LongPicture brush=None,

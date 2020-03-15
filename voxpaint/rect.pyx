@@ -39,8 +39,8 @@ cdef class Rectangle:
 
         # check if the rects overlap at all
         if ((self.right <= other.left) | (self.left >= other.right) |
-                (self.bottom <= other.top) | (self.top >= other.bottom)):
-            return None
+                (self.bottom <= other.top)  | (self.top >= other.bottom)):
+            return Rectangle((0, 0), (0, 0))
 
         cdef int x = max(self.left, other.left)
         cdef int y = max(self.top, other.top)

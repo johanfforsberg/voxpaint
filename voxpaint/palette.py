@@ -1,4 +1,6 @@
+from functools import lru_cache
 from typing import List, Tuple, Optional
+
 
 DEFAULT_COLORS = [
     (170,170,170,0),(255,255,255,255),(101,101,101,255),(223,223,223,255),(207,48,69,255),
@@ -16,12 +18,28 @@ Color = Tuple[int, int, int, int]
 class Palette:
 
     def __init__(self, colors: List[Color]=DEFAULT_COLORS):
-        self.colors = colors
+        self.size = 256
+        self.colors = colors + [(0, 0, 0, 255)] * (self.size - len(colors))
         self.version = 0
         self.overlay = None
 
         self.foreground = 1
         self.background = 0
 
+        self.overlay = ()
+
     def __hash__(self):
         return hash((id(self), self.version, self.overlay))
+
+    @property
+    def foreground_color(self):
+        return self.colors[self.foreground]
+
+    @property
+    def background_color(self):
+        return self.colors[self.background]    
+
+    @lru_cache(maxsize=1)
+    def as_tuple(self):
+        return tuple(self.colors[i] for i in range(self.size))
+        
