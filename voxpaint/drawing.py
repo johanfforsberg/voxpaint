@@ -6,7 +6,7 @@ from threading import RLock
 import numpy as np
 from euclid3 import Vector3
 
-from .draw import draw_line, blit
+from .draw import blit, draw_line, draw_rectangle
 from .edit import Edit
 from .ora import load_ora
 from .palette import Palette
@@ -48,6 +48,7 @@ class Drawing:
         edit = Edit.create(index, slc, rotation, layer, data, tool)
         self.undos.append(edit)
         np.copyto(layer[slc], data, where=data > 255)
+        self.redos.clear()
         
     def undo(self):
         try:
@@ -151,6 +152,11 @@ class DrawingView:
     def layer(self, index=None):
         index = index if index is not None else self.layer_index
         return self.data[:, :, index]
+
+    @property
+    def layers(self):
+        d = self.shape[2]
+        return (self.layer(i) for i in range(d))
                     
     @property
     def overlay(self):
@@ -189,7 +195,15 @@ class DrawingView:
 
     def prev_layer(self):
         x, y, z = self.direction
-        self.move_cursor(-x, -y, -z)        
+        self.move_cursor(-x, -y, -z)
+
+    def move_layer_up(self):
+        index = self.layer_index
+        current_layer = self.layer()
+        above_layer = self.layer(index + 1).copy()
+        self.data[:, :, index] = above_layer
+        self.data[:, :, index + 1] = current_layer
+        self.move_cursor(dz=1)
         
         
 class Overlay:
@@ -214,20 +228,44 @@ class Overlay:
             self.dirty = rect.unite(self.dirty)
         return rect
 
-    def blit(self, brush, p, color=0):
+    def blit_brush(self, brush, p, color=0):
         x, y = p
+        dx, dy = brush.center
         data = brush.get_draw_data(color)
+        return self.blit(data, (x - dx, y - dy))
+
+    def blit(self, data, p):
+        x, y = p
         with self.lock:
             rect = blit(self.data, data, x, y)
         self.dirty = rect.unite(self.dirty)
         return rect
-        
+    
     def draw_line(self, brush, p0, p1, color=0):
         x0, y0 = p0
         x1, y1 = p1
         dx, dy = brush.center
         data = brush.get_draw_data(color)
         with self.lock:
-            rect = draw_line(self.data, (x0-dx, y0-dy), (x1-dx, y1-dy), data)
+            rect = draw_line(self.data, data, (x0-dx, y0-dy), (x1-dx, y1-dy))
         self.dirty = rect.unite(self.dirty)
         return rect
+
+    def draw_rectangle(self, brush, pos, size, color=0, fill=False):
+        x, y = pos
+        dx, dy = brush.center
+        data = brush.get_draw_data(color)
+        with self.lock:
+            rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
+        self.dirty = rect.unite(self.dirty)
+        return rect
+    
+    def draw_ellipse(self, brush, pos, size, color=0, fill=False):
+        x, y = pos
+        dx, dy = brush.center
+        data = brush.get_draw_data(color)
+        with self.lock:
+            rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
+        self.dirty = rect.unite(self.dirty)
+        return rect
+    

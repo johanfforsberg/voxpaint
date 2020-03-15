@@ -18,6 +18,7 @@ from fogl.vao import VertexArrayObject
 from fogl.vertex import SimpleVertices
 
 from .brush import Brush
+from .constants import ToolName
 from .drawing import Drawing, DrawingView
 from .draw import draw_line
 from .palette import Palette
@@ -27,7 +28,7 @@ from .texture import IntegerTexture, ByteIntegerTexture
 from .tool import (PencilTool, PointsTool, SprayTool,
                    LineTool, RectangleTool, EllipseTool,
                    SelectionTool, PickerTool, FillTool)
-from .util import make_view_matrix, try_except_log, Selectable
+from .util import make_view_matrix, try_except_log, Selectable, Selectable2
 
 
 vao = VertexArrayObject()
@@ -77,11 +78,18 @@ class VoxpaintWindow(pyglet.window.Window):
              ((0, 0, 0),),
              ((0, 0, 0),)])
 
-        self.tools = Selectable([
-            PencilTool, PointsTool, SprayTool,
-            LineTool, RectangleTool, EllipseTool, FillTool,
-            SelectionTool, PickerTool
-        ])        
+        self.tools = Selectable2({
+            tool.tool: tool
+            for tool in 
+            [
+                PencilTool, PointsTool, SprayTool,
+                LineTool, RectangleTool,
+                # EllipseTool,
+                FillTool,
+                # SelectionTool,
+                PickerTool
+            ]
+        })
         self.brush = Brush((1, 1))
         self.stroke = None
 
@@ -116,9 +124,9 @@ class VoxpaintWindow(pyglet.window.Window):
             else:
                 # Erasing always uses background color
                 color = self.drawing.palette.background
-            tool = self.tool(self.view, self.brush, color)
+            tool = self.tool(self.drawing, self.brush, color)
             # self.autosave_drawing.cancel()
-            self.stroke = self.executor.submit(make_stroke, self.view.overlay, self.mouse_event_queue, tool)
+            self.stroke = self.executor.submit(make_stroke, self.view, self.mouse_event_queue, tool)
             self.stroke.add_done_callback(lambda s: self.executor.submit(self._finish_stroke, s))
             self.stroke_tool = tool
 
@@ -158,7 +166,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.view.dirty[self.view.layer_index] = tool.rect
         else:
             # If no rect is set, the tool is presumed to not have changed anything.
-            self.view.overlay.clear()
+            self.view.overlay.clear_all()
         self.mouse_event_queue = None
         self.stroke = None
         # self.autosave_drawing()
@@ -207,11 +215,23 @@ class VoxpaintWindow(pyglet.window.Window):
         print("direction", self.view.direction)
         
         if symbol == key.W:
-            self.view.next_layer()
+            if modifiers & key.MOD_SHIFT:
+                self.view.move_layer_up()
+            else:
+                self.view.next_layer()
         if symbol == key.S:
             self.view.prev_layer()
         print("cursor", self.view.cursor)
 
+        if symbol == key.P:
+            self.tools.select(ToolName.pencil)
+        if symbol == key.L:
+            self.tools.select(ToolName.line)
+        if symbol == key.F:
+            self.tools.select(ToolName.floodfill)
+        if symbol == key.I:
+            self.tools.select(ToolName.picker)
+            
         if symbol == key.Z:
             self.view.undo()
         if symbol == key.Y:
@@ -340,8 +360,8 @@ class VoxpaintWindow(pyglet.window.Window):
         cx, cy = brush.center
         old_rect = Rectangle((ix0 - cx, iy0 - cy), brush.size)
         self.overlay.clear(old_rect)
-        pos = (ix - cx, iy - cy)
-        self.overlay.blit(brush, pos, self.drawing.palette.foreground)
+        pos = (ix, iy)
+        self.overlay.blit_brush(brush, pos, self.drawing.palette.foreground)
     
     @lru_cache(1)
     def _make_view_matrix(self, window_size, size, zoom, offset):

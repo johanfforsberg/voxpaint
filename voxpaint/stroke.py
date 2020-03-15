@@ -4,21 +4,18 @@ from .util import try_except_log
 
 
 @try_except_log
-def make_stroke(layer, event_queue, tool):
+def make_stroke(view, event_queue, tool):
 
     """
     This function will consume events on the given queue until it receives
     a mouse_up event. It's expected to be running in a thread.
     """
 
-    # if layer.dirty:
-    #     layer.clear(layer.dirty)
-
     event_type = None
 
     event_type, *args = event_queue.get()
     assert event_type == "mouse_down"
-    tool.start(layer, *args)
+    tool.start(view, *args)
 
     while True:
 
@@ -44,11 +41,11 @@ def make_stroke(layer, event_queue, tool):
             # with layer.lock:
             # By taking the lock here we can prevent flickering.
             if tool.ephemeral and tool.rect:
-                layer.clear(tool.rect)
-            tool.draw(layer, *args)
+                overlay.clear(tool.rect)
+            tool.draw(view, *args)
         elif event_type == "mouse_up":
             print("done")
-            tool.finish(layer, *args)
+            tool.finish(view, *args)
             break
 
     return tool

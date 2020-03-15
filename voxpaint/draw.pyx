@@ -89,8 +89,8 @@ cdef void cblit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y) 
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
-cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
-                unsigned int [:, :] brush, int step=1):
+cpdef draw_line(unsigned int [:, :] pic, unsigned int [:, :] brush,
+                (int, int) p0, (int, int) p1, int step=1):
 
     "Draw a line from p0 to p1 using a brush or a single pixel of given color."
 
@@ -136,52 +136,34 @@ cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
     return Rectangle((x00, y00), (x11 - x00, y11 - y00))
 
 
-# cpdef draw_rectangle(LongPicture pic, (int, int) pos, (int, int) size, brush=None, unsigned int color=0,
-#                      bint fill=False, int step=1):
+cpdef draw_rectangle(unsigned int [:, :] pic, unsigned int [:, :] brush,
+                     (int, int) pos, (int, int) size,
+                     unsigned int color, bint fill=False):
+    cdef int x0, y0, w0, h0, x, y, w, h, cols, rows, bw, bh
+    x0, y0 = pos
+    w0, h0 = size
 
-#     cdef int x0, y0, w0, h0, x, y, w, h, cols, rows, bw, bh, hw, hh
-#     x0, y0 = pos
-#     w0, h0 = size
+    # ensure that the rectangle stays within the image borders
+    x = max(0, x0)
+    y = max(0, y0)
+    w = w0 - (x - x0)
+    h = h0 - (y - y0)
 
-#     # ensure that the rectangle stays within the image borders
-#     x = max(0, x0)
-#     y = max(0, y0)
-#     w = w0 - (x - x0)
-#     h = h0 - (y - y0)
+    cols, rows = pic.shape[:2]
+    w = min(cols - x, w)
+    h = min(rows - y, h)
 
-#     cols, rows = pic.size
-#     w = min(cols - x, w)
-#     h = min(rows - y, h)
+    if fill:
+        pic[x:x+w, y:y+h] = color
+    else:
+        draw_line(pic, brush, pos, (x0+w0, y0))
+        draw_line(pic, brush, (x0+w0, y0), (x0+w0, y0+h0))
+        draw_line(pic, brush, (x0+w0, y0+h0), (x0, y0+h0))
+        draw_line(pic, brush, (x0, y0+h0), pos)   
 
-#     if fill:
-#         for i in range(y, min(y+h, rows)):
-#             draw_line(pic, (x0, i), (x0+w, i), None, color, step)
-#     else:
-#         draw_line(pic, pos, (x0+w0, y0), brush, color, step)
-#         draw_line(pic, (x0+w0, y0), (x0+w0, y0+h0), brush, color, step)
-#         draw_line(pic, (x0+w0, y0+h0), (x0, y0+h0), brush, color, step)
-#         draw_line(pic, (x0, y0+h0), pos, brush, color, step)
-
-#     bw = brush.width if brush else 0
-#     bh = brush.height if brush else 0
-
-#     return pic.rect.intersect(Rectangle((x, y), (w + bw, h + bh)))
-
-
-# # cdef horizontal_line(int** image, int y, int xmin, int xmax, int color):
-# #     cdef int x
-# #     for x in range(xmin, xmax):
-# #         image[y][x] = color
-
-
-# # def vertical_line(image, x, ymin, ymax, color):
-# #     cols, rows = image.size
-# #     if 0 <= x <= cols:
-# #         ymin = max(0, ymin)
-# #         ymax = min(rows, ymax)
-# #         col = array("B", color * (ymax - ymin))
-# #         print ymax-ymin
-# #         image.data[4*(ymin*cols+x):4*(ymax*cols+x):4*cols] = col
+    bw, bh = brush.shape[:2]
+        
+    return Rectangle((x, y), (min(cols, w + bw), min(rows, h + bh)))
 
 
 # cpdef draw_ellipse(LongPicture pic, (int, int) center, (int, int) size, LongPicture brush=None,
@@ -343,54 +325,54 @@ cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
 #     return pic.rect.intersect(Rectangle((x0-a-1, y0-b-1), (2*a+bw+2, 2*b+bh+2)))
 
 
-# cpdef draw_fill(LongPicture pic, (int, int) point, unsigned int color):
+cpdef draw_fill(unsigned int [:, :] pic, (int, int) point, unsigned int color):
 
-#     # TODO kind of slow, and requires the GIL.
+    # TODO kind of slow, and requires the GIL.
 
-#     cdef int startx, starty, w, h
-#     startx, starty = point
-#     cdef list stack = [point]  # TODO maybe find some more C friendly way of keeping a stack
-#     w, h = pic.size
-#     cdef unsigned int start_col = pic[startx, starty] & 0xFF
+    cdef int startx, starty, w, h
+    startx, starty = point
+    cdef list stack = [point]  # TODO maybe find some more C friendly way of keeping a stack
+    w, h = pic.shape[:2]
+    cdef unsigned int start_col = pic[startx, starty] & 0xFF
 
-#     if start_col == color & 0xFF:
-#         return
+    if start_col == color & 0xFF:
+        return
 
-#     cdef int x, y, xmin, xmax, ymin, ymax, xstart
-#     cdef bint reach_top, reach_bottom
-#     xmin, xmax = w, 0
-#     ymin, ymax = h, 0
+    cdef int x, y, xmin, xmax, ymin, ymax, xstart
+    cdef bint reach_top, reach_bottom
+    xmin, xmax = w, 0
+    ymin, ymax = h, 0
 
-#     while stack:
-#         x, y = stack.pop()
-#         # search left
-#         while x >= 0 and start_col == pic[x, y]:
-#             x -= 1
-#         x += 1
-#         reach_top = reach_bottom = False
+    while stack:
+        x, y = stack.pop()
+        # search left
+        while x >= 0 and start_col == pic[x, y]:
+            x -= 1
+        x += 1
+        reach_top = reach_bottom = False
 
-#         # search right
-#         while x < w and pic[x, y] == start_col:
-#             pic[x, y] = color  # color this pixel
-#             xmin, xmax = min(xmin, x), max(xmax, x)
-#             ymin, ymax = min(ymin, y), max(ymax, y)
-#             if 0 < y < h - 1:
+        # search right
+        while x < w and pic[x, y] == start_col:
+            pic[x, y] = color  # color this pixel
+            xmin, xmax = min(xmin, x), max(xmax, x)
+            ymin, ymax = min(ymin, y), max(ymax, y)
+            if 0 < y < h - 1:
 
-#                 # check pixel above
-#                 if start_col == pic[x, y-1]:
-#                     if not reach_top:
-#                         stack.append((x, y-1))  # add previous line
-#                         reach_top = True
-#                 elif reach_top:
-#                     reach_top = False
+                # check pixel above
+                if start_col == pic[x, y-1]:
+                    if not reach_top:
+                        stack.append((x, y-1))  # add previous line
+                        reach_top = True
+                elif reach_top:
+                    reach_top = False
 
-#                 # check pixel below
-#                 if start_col == pic[x, y+1]:
-#                     if not reach_bottom:
-#                         stack.append((x, y+1))  # add next line
-#                         reach_bottom = True
-#                 elif reach_bottom:
-#                     reach_bottom = False
-#             x += 1
+                # check pixel below
+                if start_col == pic[x, y+1]:
+                    if not reach_bottom:
+                        stack.append((x, y+1))  # add next line
+                        reach_bottom = True
+                elif reach_bottom:
+                    reach_bottom = False
+            x += 1
 
-#     return Rectangle((xmin, ymin), (xmax-xmin+1, ymax-ymin+1))
+    return Rectangle((xmin, ymin), (xmax-xmin+1, ymax-ymin+1))

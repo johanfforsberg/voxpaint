@@ -106,6 +106,28 @@ class Selectable:
         self.items[a], self.items[b] = self.items[b], self.items[a]
 
 
+class Selectable2:
+
+    def __init__(self, items: dict):
+        self.items = items
+        self._current_key = list(items.keys())[0]
+        self._last = []
+
+    @property
+    def current(self):
+        return self.items[self._current_key]
+
+    def select(self, key):
+        print(self.items)
+        assert key in self.items
+        try:
+            self._last.remove(key)
+        except ValueError:
+            pass
+        self._last.append(key)
+        self._current_key = key        
+        
+
 def throttle(interval=0.1):
     """
     A decorator that ensures that the function is not run more often
