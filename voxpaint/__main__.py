@@ -17,13 +17,17 @@ from fogl.texture import Texture, ByteTexture
 from fogl.vao import VertexArrayObject
 from fogl.vertex import SimpleVertices
 
+from .brush import Brush
 from .drawing import Drawing, DrawingView
 from .draw import draw_line
 from .palette import Palette
+from .rect import Rectangle
 from .stroke import make_stroke
 from .texture import IntegerTexture, ByteIntegerTexture
-from .tool import PencilTool
-from .util import make_view_matrix, try_except_log
+from .tool import (PencilTool, PointsTool, SprayTool,
+                   LineTool, RectangleTool, EllipseTool,
+                   SelectionTool, PickerTool, FillTool)
+from .util import make_view_matrix, try_except_log, Selectable
 
 
 vao = VertexArrayObject()
@@ -49,11 +53,13 @@ MAX_ZOOM = 5
 class VoxpaintWindow(pyglet.window.Window):
 
     def __init__(self, *args, path=None, **kwargs):
+        
         super().__init__(*args, **kwargs, resizable=True, vsync=False)
 
         if path:
             self.drawing = Drawing.from_ora(path)
         else:
+            # self.drawing = Drawing((640, 480, 10), palette=Palette())
             self.drawing = Drawing((128, 128, 128), palette=Palette())
         self.view = DrawingView(self.drawing)
 
@@ -71,13 +77,25 @@ class VoxpaintWindow(pyglet.window.Window):
              ((0, 0, 0),),
              ((0, 0, 0),)])
 
-        self.brush = None
-        self.tool = PencilTool
+        self.tools = Selectable([
+            PencilTool, PointsTool, SprayTool,
+            LineTool, RectangleTool, EllipseTool, FillTool,
+            SelectionTool, PickerTool
+        ])        
+        self.brush = Brush((30, 20))
         self.stroke = None
 
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.mouse_event_queue = None
 
+    @property
+    def tool(self):
+        return self.tools.current
+
+    @property
+    def overlay(self):
+        return self.view.overlay
+    
     # @no_imgui_events
     def on_mouse_press(self, x, y, button, modifiers):
         if not self.drawing:
@@ -111,6 +129,14 @@ class VoxpaintWindow(pyglet.window.Window):
             x, y = self._to_image_coords(x, y)
             pos = int(x), int(y)
             self.mouse_event_queue.put(("mouse_up", pos, button, modifiers))
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        "Callback for mouse motion without buttons held"
+        if not self.view:
+            return
+        # self._update_cursor(x, y)
+        # if self.tools.current.brush_preview:
+        # self._draw_brush_preview(x - dx, y - dy, x, y)
             
     # @cache_clear(get_layer_preview_texture)
     @try_except_log
@@ -179,22 +205,16 @@ class VoxpaintWindow(pyglet.window.Window):
         print("direction", self.view.direction)
         
         if symbol == key.W:
-            x, y, z = self.view.direction
-            self.view.move_cursor(x, y, z)
+            self.view.next_layer()
         if symbol == key.S:
-            x, y, z = self.view.direction
-            self.view.move_cursor(-x, -y, -z)
+            self.view.prev_layer()
         print("cursor", self.view.cursor)
 
         if symbol == key.Z:
             self.view.undo()
         if symbol == key.Y:
             self.view.redo()
-        
-        if symbol == key.U:
-            plane = self.view.layer
-            draw_line(plane, (0, 0), (10, 10), None, 1)
-        
+                
     def on_draw(self):
         # gl.glClear(gl.GL_COLOR_BUFFER_BIT)
         gl.glClearBufferfv(gl.GL_COLOR, 0, (gl.GLfloat * 4)(0.25, 0.25, 0.25, 1))
@@ -240,6 +260,7 @@ class VoxpaintWindow(pyglet.window.Window):
                     gl.glTextureSubImage2D(tex.name, 0, 0, 0, w, h,
                                            gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
                                            layer_data)
+                    self.view.dirty[i] = None
                 with tex:
                     if i == cursor_pos:
                         second_texture = overlay_texture
@@ -295,6 +316,37 @@ class VoxpaintWindow(pyglet.window.Window):
         wx = scale * (x - w / 2) + ww / 2 + ox
         wy = -(scale * (y - h / 2) - wh / 2 - oy)
         return wx, wy
+
+    @lru_cache(1)
+    def _over_image(self, x, y):
+        if self.drawing:
+            ix, iy = self._to_image_coords(x, y)
+            w, h = self.view.size
+            return 0 <= ix < w and 0 <= iy < h
+    
+    @try_except_log
+    def _draw_brush_preview(self, x0, y0, x, y):
+        if self.overlay.brush_preview_dirty:
+            self.overlay.clear(self.overlay.brush_preview_dirty)
+        self.overlay.brush_preview_dirty = None
+        # io = imgui.get_io()
+        # if io.want_capture_mouse:
+        #     return
+        if self.stroke or not self._over_image(x, y):
+            return
+        ix0, iy0 = self._to_image_coords(x0, y0)
+        ix, iy = self._to_image_coords(x, y)
+        overlay = self.overlay
+        brush = self.brush
+        bw, bh = brush.size
+        cx, cy = brush.center
+        # Clear the previous brush preview
+        # TODO when leaving the image, or screen, we also need to clear
+        old_rect = Rectangle((ix0 - cx, iy0 - cy), brush.size)
+        overlay.clear(old_rect)
+        rect = Rectangle((ix - cx, iy - cy), brush.size)
+        #color = None if isinstance(self.brush, np.ndarray) else self.drawing.palette.foreground
+        # overlay.blit(brush.get_draw_data(self.drawing.palette.foreground), rect)
     
     @lru_cache(1)
     def _make_view_matrix(self, window_size, size, zoom, offset):
@@ -359,11 +411,16 @@ class OldpaintEventLoop(pyglet.app.EventLoop):
     
 if __name__ == "__main__":
 
-    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("orafile", nargs="?")
+
+    args = parser.parse_args()
     
     gl_config = pyglet.gl.Config(major_version=4, minor_version=5,  # Minimum OpenGL requirement
                                  double_buffer=False)  # Double buffering gives noticable cursor lag
 
-    VoxpaintWindow(config=gl_config, path=sys.argv[1])
+    VoxpaintWindow(config=gl_config, path=args.orafile)
     pyglet.app.event_loop = OldpaintEventLoop()
     pyglet.app.run(0.02)

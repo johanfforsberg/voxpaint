@@ -1,9 +1,7 @@
-from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional, Tuple, List
 import math
 from threading import RLock
-import zlib
 
 import numpy as np
 from euclid3 import Vector3
@@ -16,48 +14,6 @@ from .rect import Rectangle
 
 
 Shape = Tuple[int, ...]
-
-
-@dataclass(frozen=True)
-class Edit:
-    
-    index: int
-    slc: tuple
-    rotation: tuple
-    orig_data: bytes
-    data: bytes
-    points: list
-    color: int
-
-    @classmethod
-    def create(cls, index, slc, rotation, layer, data, tool):
-        return cls(
-            index,
-            slc,
-            rotation,
-            zlib.compress(layer[slc].tobytes()),
-            zlib.compress(data.tobytes()),
-            [],  # tool.points,
-            tool.color
-        )
-
-    def revert(self, drawing):
-        slc = sx, sy = self.slc
-        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
-        data = np.frombuffer(zlib.decompress(self.orig_data),
-                             dtype=np.uint8).reshape(shape)
-        view = DrawingView(drawing, rotation=self.rotation)
-        layer = view.layer(self.index)
-        np.copyto(layer[slc], data)
-
-    def perform(self, drawing):
-        slc = sx, sy = self.slc
-        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
-        data = np.frombuffer(zlib.decompress(self.data), dtype=np.uint32)
-        data = data.reshape(shape)
-        view = DrawingView(drawing, rotation=self.rotation)
-        layer = view.layer(self.index)
-        np.copyto(layer[slc], data, where=data > 255)
         
 
 class Drawing:
@@ -109,6 +65,9 @@ class Drawing:
             edit.perform(self)
         except IndexError:
             pass
+
+    def get_view(self, rotation):
+        return DrawingView(self, rotation)
         
     
 class DrawingView:
@@ -174,6 +133,10 @@ class DrawingView:
         return self.data.shape
 
     @property
+    def size(self):
+        return self.data.shape[:2]
+
+    @property
     def layer_index(self):
         "The depth of the current layer index as seen from the user."
         x, y, z = self.direction
@@ -220,6 +183,14 @@ class DrawingView:
     def redo(self):
         self.drawing.redo()
         self._get_dirty.cache_clear()
+
+    def next_layer(self):
+        x, y, z = self.direction
+        self.move_cursor(x, y, z)        
+
+    def prev_layer(self):
+        x, y, z = self.direction
+        self.move_cursor(-x, -y, -z)        
         
         
 class Overlay:
@@ -229,6 +200,7 @@ class Overlay:
         self.data = np.zeros(size, dtype=np.uint32)
         self.dirty = None
         self.lock = RLock()
+        self.brush_preview_dirty = None
 
     def clear(self, rect=None):
         if rect:
@@ -239,7 +211,16 @@ class Overlay:
         self.data[x0:x1, y0:y1] = 0
         self.dirty = rect.unite(self.dirty)
 
+    def blit(self, data, rect):
+        #self.data[rect.as_slice()] = data
+        #self.dirty = rect.unite(self.dirty)
+        pass
+        
     def draw_line(self, brush, p0, p1, color=0):
-        rect = draw_line(self.data, p0, p1, brush, color)
+        x0, y0 = p0
+        x1, y1 = p1
+        dx, dy = brush.center
+        data = brush.get_draw_data(color)
+        rect = draw_line(self.data, (x0-dx, y0-dy), (x1-dx, y1-dy), data)
         self.dirty = rect.unite(self.dirty)
         return rect

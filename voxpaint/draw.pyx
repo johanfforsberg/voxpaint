@@ -10,8 +10,51 @@ from .rect cimport Rectangle
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
+cpdef void paste(unsigned int [:, :] pic, unsigned int [:, :] brush, int x, int y) nogil:
+    "Copy image data without caring about transparency"
+    cdef int w, h, bw, bh
+    w, h = pic.shape[:2]
+    bw, bh = brush.shape[:2]
+
+    cdef int px0, px1, py0, py1, bx0, bx1, by0, by1
+    px0 = max(0, x)
+    px1 = min(w, x + bw)
+    py0 = max(0, y)
+    py1 = min(h, y + bh)
+    if (px0 < px1) and (py0 < py1):
+        bx0 = px0 - x
+        bx1 = px1 - x
+        by0 = py0 - y
+        by1 = py1 - y
+        pic[px0:px1, py0:py1] = brush[bx0:bx1, by0:by1]
+
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.        
+cpdef void blit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y) nogil:
+    "Draw a brush onto an image, skipping transparent pixels."
+    cdef int w, h, bw, bh, y1, x1, x2, y2, offset1, offset2
+    w, h = pic.shape[:2]
+    bw, bh = brush.shape[:2]
+    for y1 in range(bh):
+        y2 = y + y1
+        if (y2 < 0):
+            continue
+        if (y2 >= h):
+            break
+        for x1 in range(bw):
+            x2 = x + x1
+            if (x2 < 0):
+                continue
+            if (x2 >= w):
+                break
+            if brush[x1, y1] >> 24:  # Ignore 100% transparent pixels
+                pic[x2, y2] = brush[x1, y1]
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.
 cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
-                unsigned int [:, :] brush=None, unsigned char color=0, int step=1, bint set_dirty=True):
+                unsigned int [:, :] brush, int step=1):
 
     "Draw a line from p0 to p1 using a brush or a single pixel of given color."
 
@@ -24,26 +67,20 @@ cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
     dy = -iabs(y1 - y)
     sy = 1 if y < y1 else -1
     err = dx+dy
-    bw = brush.size[0] if brush is not None else 1
-    bh = brush.size[1] if brush is not None else 1
+    bw = brush.shape[0] if brush is not None else 1
+    bh = brush.shape[1] if brush is not None else 1
     w, h = pic.shape[:2]
 
     cdef int i = 0
     cdef int e2
 
-    cdef unsigned int color32 = color + 255*2**24
+    cdef int px0, px1, py0, py1, bx0, bx1, by0, by1
+    cdef unsigned int[:, :] src, dst
 
     with nogil:
         while True:
             if i % step == 0:
-                if brush is not None:
-                    pic[x:x+bw, y:y+bh] = brush
-                    # pic.paste(brush, x, y, True)
-                else:
-                    if 0 <= x < w and 0 <= y < h:
-                        #pic.set_pixel(x, y, color)
-                        pic[x, y] = color32
-                        i += 1
+                blit(pic, brush, x, y)
             if x == x1 and y == y1:
                 break
             e2 = 2*err
@@ -59,8 +96,6 @@ cpdef draw_line(unsigned int [:, :] pic, (int, int) p0, (int, int) p1,
     cdef int x11 = min(w, max(x0, x1) + bw)
     cdef int y11 = min(h, max(y0, y1) + bh)
 
-    # return (x00, y00), (x11 - x00, y11 - y00)
-    
     return Rectangle((x00, y00), (x11 - x00, y11 - y00))
 
 
