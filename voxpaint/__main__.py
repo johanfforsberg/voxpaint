@@ -117,6 +117,9 @@ class VoxpaintWindow(pyglet.window.Window):
         self.plugins = {}
         init_plugins(self)
         self.drawing.plugins = self.plugins
+
+        self.show_only_current_layer = False
+        self.layer_being_switched = False
         
     @property
     def tool(self):
@@ -244,6 +247,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 self.view.move_layer(1)
             else:
                 self.view.next_layer()
+                self.layer_being_switched = True
         elif symbol == key.S:
             if modifiers & key.MOD_SHIFT:
                 self.view.move_layer(-1)
@@ -251,7 +255,10 @@ class VoxpaintWindow(pyglet.window.Window):
                 self.drawing.to_ora("/tmp/hej.ora")
             else:
                 self.view.prev_layer()
-            
+                self.layer_being_switched = True
+        elif symbol == key.O:
+            self.show_only_current_layer = not self.show_only_current_layer
+        
         elif symbol == key.P:
             self.tools.select(ToolName.pencil)
         elif symbol == key.L:
@@ -276,6 +283,10 @@ class VoxpaintWindow(pyglet.window.Window):
 
         elif symbol == key.F4:
             init_plugins(self)
+
+    def on_key_release(self, symbol, modifiers):
+        if symbol in {key.S, key.W}:
+            self.layer_being_switched = False
             
     def on_draw(self):
         self._render_view()
@@ -322,6 +333,11 @@ class VoxpaintWindow(pyglet.window.Window):
                 # A better version would be to keep two extra fbs, one for the layers
                 # below and one above, and render all non-current layers to those.
                 # As long as no other layers are modified the fbs can be re-used.
+
+                current = i == self.view.layer_index
+                if not current and (self.layer_being_switched or self.show_only_current_layer):
+                    continue
+                                    
                 tex = self._get_layer_texture(i, size)
                 dirty = self.view.dirty[i]
                 if dirty and self.drawing.lock.acquire(timeout=0.01):
