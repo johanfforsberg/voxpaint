@@ -19,6 +19,8 @@ def make_stroke(view, event_queue, tool):
 
     while True:
 
+        prev_args = args
+        
         # First check for events
         if tool.period is None:
             event_type, *args = event_queue.get()
@@ -38,8 +40,9 @@ def make_stroke(view, event_queue, tool):
 
         # Now use the tool appropriately
         if event_type == "mouse_drag":
-            # with layer.lock:
-            # By taking the lock here we can prevent flickering.
+            if args == prev_args:
+                continue
+            # TODO maybe getting the lock around this would prevent some flickering?
             if tool.ephemeral and tool.rect:
                 view.overlay.clear(tool.rect)
             tool.draw(view, *args)
