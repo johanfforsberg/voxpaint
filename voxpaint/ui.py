@@ -125,9 +125,16 @@ def render_layers(view):
     # imgui.text(f"{x}, {y}, {z}")
     min_value = 0
     max_value = n_layers - 1
-    changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
-                                            min_value=min_value,
-                                            max_value=max_value)
+    if sum(view.direction) > 0:
+        changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
+                                                min_value=min_value,
+                                                max_value=max_value)
+    else:
+        index = n_layers - index - 1
+        changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
+                                                min_value=max_value,
+                                                max_value=min_value)
+        index = n_layers + index + 1
     if changed:
         delta = new_index - index
         view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)

@@ -242,9 +242,9 @@ class SelectionTool(Tool):
         return ""
 
 
-class PickerTool(Tool):
+class ColorPickerTool(Tool):
 
-    "Set the current color/alayer to the one under the mouse when clicked."
+    "Set the current color to the one under the mouse when clicked."
 
     tool = ToolName.picker
     brush_preview = False
@@ -254,31 +254,43 @@ class PickerTool(Tool):
         self.color = None
 
     def finish(self, view, point, buttons, modifiers):
-        if window.key.MOD_SHIFT:
-            # Find the layer under the cursor
-            for i, layer in enumerate(reversed(list(view.layers))):
-                color = layer[point]
-                if color != 0:
-                    break
-            else:
-                return
-            # TODO too tired to figure this out properly, do that :)
-            rx, ry, rz = view.direction
-            sign = sum(view.direction)
-            d = view.shape[2]
-            if sign > 0:
-                view.set_cursor(d - (rx*i) - 1, d - (ry*i) - 1, d - (rz*i) - 1)
-            else:
-                view.set_cursor(-(rx*i), -(ry*i), -(rz*i))
-        else:
-            # Pick color
-            for layer in reversed(list(view.layers)):
-                color = layer[point]
-                if color != 0:
-                    break
+        # Pick color
+        for layer in reversed(list(view.layers)):
+            color = layer[point]
+            if color != 0:
+                break
 
-            if buttons == window.mouse.LEFT:
-                self.drawing.palette.foreground = color
-            elif buttons == window.mouse.RIGHT:
-                self.drawing.palette.background = color
+        if buttons == window.mouse.LEFT:
+            self.drawing.palette.foreground = color
+        elif buttons == window.mouse.RIGHT:
+            self.drawing.palette.background = color
+
+
+class LayerPickerTool(Tool):
+
+    "Set the current layer to the one under the mouse when clicked."
+
+    tool = ToolName.picker
+    brush_preview = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.color = None
+
+    def finish(self, view, point, buttons, modifiers):
+        # Find the layer under the cursor
+        for i, layer in enumerate(reversed(list(view.layers))):
+            color = layer[point]
+            if color != 0:
+                break
+        else:
+            return
+        # TODO too tired to figure this out properly, do that :)
+        rx, ry, rz = view.direction
+        sign = sum(view.direction)
+        d = view.shape[2]
+        if sign > 0:
+            view.set_cursor(d - (rx*i) - 1, d - (ry*i) - 1, d - (rz*i) - 1)
+        else:
+            view.set_cursor(-(rx*i), -(ry*i), -(rz*i))
                 

@@ -31,7 +31,7 @@ from .stroke import make_stroke
 from .texture import IntegerTexture, ByteIntegerTexture
 from .tool import (PencilTool, PointsTool, SprayTool,
                    LineTool, RectangleTool, EllipseTool,
-                   SelectionTool, PickerTool, FillTool)
+                   SelectionTool, ColorPickerTool, LayerPickerTool, FillTool)
 from . import ui
 from .util import make_view_matrix, try_except_log, Selectable, Selectable2, no_imgui_events
 
@@ -92,9 +92,10 @@ class VoxpaintWindow(pyglet.window.Window):
                 # EllipseTool,
                 FillTool,
                 # SelectionTool,
-                PickerTool
             ]
         })
+        self.temp_tool = None
+        
         self._brush = Brush((1, 1))
         self.stroke = None
 
@@ -123,7 +124,7 @@ class VoxpaintWindow(pyglet.window.Window):
         
     @property
     def tool(self):
-        return self.tools.current
+        return self.temp_tool or self.tools.current
 
     @property
     def overlay(self):
@@ -135,6 +136,7 @@ class VoxpaintWindow(pyglet.window.Window):
     
     @no_imgui_events
     def on_mouse_press(self, x, y, button, modifiers):
+        
         if not self.drawing:
             return
         if self.mouse_event_queue:
@@ -234,6 +236,8 @@ class VoxpaintWindow(pyglet.window.Window):
             
     def on_key_press(self, symbol, modifiers):
 
+        print("press", symbol, modifiers)
+
         if symbol == key.LEFT:
             self.view.rotate(dz=-1)
         elif symbol == key.RIGHT:
@@ -284,12 +288,27 @@ class VoxpaintWindow(pyglet.window.Window):
         elif symbol == key.Y:
             self.view.redo()
 
+        elif symbol in {key.LSHIFT, key.RSHIFT}:
+            self.temp_tool = LayerPickerTool
+            self.overlay.clear_all()
+        elif symbol in {key.LCTRL, key.RCTRL}:
+            self.temp_tool = ColorPickerTool
+            self.overlay.clear_all()
+            
+        # elif symbol == {key.}
+            
         elif symbol == key.F4:
             init_plugins(self)
 
     def on_key_release(self, symbol, modifiers):
+
+        print("release", symbol, modifiers)        
+        
         if symbol in {key.S, key.W}:
             self.layer_being_switched = False
+            
+        elif symbol in {key.LSHIFT, key.RSHIFT, key.LCTRL, key.RCTRL}:
+            self.temp_tool = None
             
     def on_draw(self):
         self._render_view()
