@@ -224,17 +224,20 @@ class Plugin:
                 return
 
             w, h = size
+            vw = w + 8
+            vh = h + h // 2
+            view_size = (vw, vh)
             model_matrix = Matrix4.new_translate(-w/2, -h/2, depth/2).scale(1, 1, 1/math.sin(math.pi/3))
 
             far = w*2
             near = 0
             frust = Matrix4()
-            frust[:] = (2/w, 0, 0, 0,
-                        0, 2/h, 0, 0,
+            frust[:] = (2/vw, 0, 0, 0,
+                        0, 2/vh, 0, 0,
                         0, 0, -2/(far-near), 0,
                         0, 0, -(far+near)/(far-near), 1)
             
-            offscreen_buffer = self._get_buffer(size)
+            offscreen_buffer = self._get_buffer(view_size)
             with offscreen_buffer, self.program, \
                     enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
 
@@ -250,12 +253,12 @@ class Plugin:
                 gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
                                       gl_matrix(frust * view_matrix * model_matrix))
 
-                gl.glViewport(0, 0, *size)
+                gl.glViewport(0, 0, vw, vh)
                 gl.glPointSize(1.0)
 
                 mesh.draw(mode=gl.GL_POINTS)
 
-            shadow_buffer = self._get_shadow_buffer(size)                
+            shadow_buffer = self._get_shadow_buffer(view_size)                
             with shadow_buffer, self.program, \
                     enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
                 view_matrix = (
@@ -268,12 +271,12 @@ class Plugin:
                 gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
                                       gl_matrix(frust * view_matrix * model_matrix))
 
-                gl.glViewport(0, 0, *size)
+                gl.glViewport(0, 0, vw, vh)
                 gl.glPointSize(1.0)
 
                 mesh.draw(mode=gl.GL_POINTS)
 
-            final_buffer = self._get_final_buffer(size)
+            final_buffer = self._get_final_buffer(view_size)
             
             with self._vao, final_buffer, self._copy_program, disabled(gl.GL_CULL_FACE, gl.GL_DEPTH_TEST):
                 with offscreen_buffer["color"], offscreen_buffer["normal"], offscreen_buffer["position"], shadow_buffer["depth"]:
@@ -281,8 +284,8 @@ class Plugin:
                 
             # TODO must be careful here so that the texture is always valid
             # (since imgui may read it at any time) Find a way to ensure this.
-            texture = self._get_texture(size)
+            texture = self._get_texture(view_size)
             gl.glCopyImageSubData(final_buffer["color"].name, gl.GL_TEXTURE_2D, 0, 0, 0, 0,
                                   texture.name, gl.GL_TEXTURE_2D, 0, 0, 0, 0,
-                                  w, h, 1)
-            self.texture = texture, size
+                                  vw, vh, 1)
+            self.texture = texture, view_size
