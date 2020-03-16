@@ -46,7 +46,7 @@ def render_palette_popup(drawing: Drawing):
 
     _, opened = imgui.begin("Color popup", True)
 
-    imgui.begin_child("Colors", width=300, height=300)
+    imgui.begin_child("Colors")
 
     imgui.push_style_var(imgui.STYLE_ITEM_SPACING, (0, 0))  # Make layout tighter
     width = int(imgui.get_window_content_region_width()) // 25
@@ -116,7 +116,7 @@ def render_palette_popup(drawing: Drawing):
 
 
 def render_layers(view):
-    imgui.begin_child("Layers", border=False, height=0)
+    imgui.begin("Layers")
 
     layers = list(view.layers)
     n_layers = len(layers)
@@ -139,4 +139,4 @@ def render_layers(view):
         delta = new_index - index
         view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)
     
-    imgui.end_child()
+    imgui.end()

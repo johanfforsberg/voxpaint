@@ -222,6 +222,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 self.view.next_layer()
             else:
                 self.view.prev_layer()
+            self.view.layer_being_switched = True
         else:
             ox, oy = self.offset
             ix, iy = self._to_image_coords(x, y)
@@ -235,9 +236,9 @@ class VoxpaintWindow(pyglet.window.Window):
 
         print("press", symbol, modifiers)
 
-        if symbol == key.LEFT:
+        if symbol in {key.LEFT, key.A}:
             self.view.rotate(dz=-1)
-        elif symbol == key.RIGHT:
+        elif symbol in {key.RIGHT, key.D}:
             self.view.rotate(dz=1)
         elif symbol == key.UP:
             self.view.rotate(dx=-1)
@@ -305,6 +306,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.view.layer_being_switched = False
             
         elif symbol in {key.LSHIFT, key.RSHIFT, key.LCTRL, key.RCTRL}:
+            self.view.layer_being_switched = False
             self.temp_tool = None
             
     def on_draw(self):
@@ -425,7 +427,7 @@ class VoxpaintWindow(pyglet.window.Window):
         ox, oy = self.offset
         ix = (x - (ww / 2 + ox)) / scale + w / 2
         iy = -(y - (wh / 2 + oy)) / scale + h / 2
-        return int(ix), int(iy)
+        return ix, iy
 
     def _to_window_coords(self, x, y):
         "Convert image coordinates to window coordinates"
@@ -435,7 +437,7 @@ class VoxpaintWindow(pyglet.window.Window):
         ox, oy = self.offset
         wx = scale * (x - w / 2) + ww / 2 + ox
         wy = -(scale * (y - h / 2) - wh / 2 - oy)
-        return int(wx), int(wy)
+        return wx, wy
 
     @lru_cache(1)
     def _over_image(self, x, y):
