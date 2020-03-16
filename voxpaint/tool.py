@@ -273,11 +273,18 @@ class LayerPickerTool(Tool):
     tool = ToolName.picker
     brush_preview = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.color = None
+    def start(self, view, point, buttons, modifiers):
+        view.layer_being_switched = True
+        self._set_layer(view, point)
 
+    def draw(self, view, point, buttons, modifiers):
+        self._set_layer(view, point)
+        
     def finish(self, view, point, buttons, modifiers):
+        self._set_layer(view, point)
+        view.layer_being_switched = False
+
+    def _set_layer(self, view, point):
         # Find the layer under the cursor
         for i, layer in enumerate(reversed(list(view.layers))):
             color = layer[point]

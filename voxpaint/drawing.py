@@ -109,6 +109,9 @@ class DrawingView:
         self.rotation = rotation
         self.cursor = (0, 0, 0)
         self.brushes = []
+        
+        self.show_only_current_layer = False
+        self.layer_being_switched = False
 
     def rotate(self, dx=0, dy=0, dz=0):
         pitch, yaw, roll = self.rotation
@@ -126,6 +129,11 @@ class DrawingView:
         self.cursor = (x if x is not None else x0,
                        y if y is not None else y0,
                        z if z is not None else z0)
+
+    def layer_visible(self, index):
+        if index == self.layer_index:
+            return True
+        return not self.show_only_current_layer and not self.layer_being_switched
         
     @property
     def data(self):
