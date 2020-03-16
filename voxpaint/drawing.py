@@ -6,9 +6,9 @@ from threading import RLock
 import numpy as np
 from euclid3 import Vector3, Matrix4
 
-from .brush import Brush
+from .brush import ImageBrush
 from .draw import blit, draw_line, draw_rectangle
-from .edit import Edit
+from .edit import LayerEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
@@ -71,7 +71,7 @@ class Drawing:
         # use.
         view = DrawingView(self, rotation=rotation)
         layer = view.layer(index)
-        edit = Edit.create(index, slc, rotation, layer, data, tool)
+        edit = LayerEdit.create(index, slc, rotation, layer, data, tool)
         self.undos.append(edit)
         np.copyto(layer[slc], data, where=data > 255)
         self.redos.clear()
@@ -239,7 +239,6 @@ class DrawingView:
     def move_layer(self, d):
         index = self.layer_index
         other_index = index + d
-        print(index, other_index, self.shape)
         if not 0 <= other_index < self.shape[2]:
             return
         current_layer = self.layer()
@@ -252,9 +251,9 @@ class DrawingView:
 
     def make_brush(self, rect=None):
         data = self.layer().copy()
-        brush = Brush(data=data)
+        brush = ImageBrush(data=data)
         self.brushes.append(brush)
-        
+
         
 class Overlay:
 

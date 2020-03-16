@@ -153,6 +153,7 @@ class VoxpaintWindow(pyglet.window.Window):
             else:
                 # Erasing always uses background color
                 color = self.drawing.palette.background
+                
             tool = self.tool(self.drawing, self.brush, color)
             # self.autosave_drawing.cancel()
             self.stroke = self.executor.submit(make_stroke, self.view, self.mouse_event_queue, tool)
@@ -170,8 +171,8 @@ class VoxpaintWindow(pyglet.window.Window):
         if self.stroke or not self.view:
             return
         # self._update_cursor(x, y)
-        # if self.tools.current.brush_preview:
-        self._draw_brush_preview(x - dx, y - dy, x, y)
+        if self.tool.brush_preview:
+            self._draw_brush_preview(x - dx, y - dy, x, y)
 
     def on_mouse_leave(self, x, y):
         if not self.stroke:
@@ -273,8 +274,10 @@ class VoxpaintWindow(pyglet.window.Window):
         elif symbol == key.B:
             if modifiers & key.MOD_SHIFT:
                 self.view.brushes.clear()
+                self.view.overlay.clear_all()
             else:
                 self.view.make_brush()
+                self.view.overlay.clear_all()
             
         elif symbol == key.Z:
             self.view.undo()

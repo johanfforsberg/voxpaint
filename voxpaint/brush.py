@@ -19,5 +19,16 @@ class Brush:
             
     @lru_cache(2)
     def get_draw_data(self, color):
-        rgba_color = color + 255 * 2**24
-        return self.data * rgba_color
+        #rgba_color = color + 
+        return np.clip(self.data, 0, 1) * color + 255 * 2**24
+
+
+class ImageBrush(Brush):
+
+    @lru_cache(2)    
+    def get_draw_data(self, color=None):
+        filled = np.clip(self.data, 0, 1)
+        if color > 0:
+            color = 1
+        return (self.data * color + filled * 2**24).astype(np.uint32)
+        
