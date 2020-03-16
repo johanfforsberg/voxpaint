@@ -263,13 +263,13 @@ class PickerTool(Tool):
             else:
                 return
             # TODO too tired to figure this out properly, do that :)
-            x, y, z = view.direction
+            rx, ry, rz = view.direction
             sign = sum(view.direction)
             d = view.shape[2]
             if sign > 0:
-                view.set_cursor(d - (x*i) - 1, d - (y*i) - 1, d - (z*i) - 1)
+                view.set_cursor(d - (rx*i) - 1, d - (ry*i) - 1, d - (rz*i) - 1)
             else:
-                view.set_cursor(-(x*i), -(y*i), -(z*i))
+                view.set_cursor(-(rx*i), -(ry*i), -(rz*i))
         else:
             # Pick color
             for layer in reversed(list(view.layers)):
