@@ -1,11 +1,13 @@
+from ctypes import c_ubyte
 from itertools import chain, product
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 import math
 from time import time
 
-from pyglet import gl
 from euclid3 import Matrix4
+import numpy as np
+from pyglet import gl
 
 from fogl.framebuffer import FrameBuffer
 from fogl.glutil import gl_matrix
@@ -19,12 +21,14 @@ from fogl.util import enabled, disabled
 
 VERTEX_SHADER = b"""
 #version 450 core
+precision lowp float;
 
 layout (location = 0) in vec4 position;
-layout (location = 1) in vec4 color;
+layout (location = 1) in uint color_index;
 layout (location = 2) in vec4 normal;
 
 layout (location = 0) uniform mat4 proj_matrix;
+layout (location = 3) uniform vec4[256] palette;
 
 out VS_OUT {
   vec4 color;
@@ -34,7 +38,7 @@ out VS_OUT {
 
 void main() {
   gl_Position = proj_matrix * position;
-  vs_out.color = color;
+  vs_out.color = palette[color_index];
   vs_out.normal = normal;
 }
 """
@@ -59,6 +63,7 @@ void main(void) {
   float z = gl_FragCoord.z;
   float light = 1 - 0.5 * z;
   color_out = fs_in.color * vec4(light, light, light, 1);
+  //color_out = palette[fs_in.color];
   normal_out = fs_in.normal;
   position_out = gl_FragCoord;
 }
@@ -120,7 +125,7 @@ void main(void) {
 class VoxelVertices(Vertices):
     _fields = [
         ('position', gl.GL_FLOAT, 4),
-        ('color', gl.GL_FLOAT, 4),
+        ('color', gl.GL_UNSIGNED_BYTE, 1),
         ('normal', gl.GL_FLOAT, 4),
     ]    
 
@@ -186,29 +191,23 @@ class Plugin:
     def _get_float_color(self, r, g, b, a):
         return r/255, g/255, b/255, a/255
 
-    # @lru_cache(100)
-    def _get_layer_vertices(self, layer, rect, colors, z):
-
-        # if not layer.visible:
-        #     return []
-        #subimage = layer.get_subimage(rect)
-        subdata = layer[rect.as_slice()]
-        w, h = rect.size
-        # TODO "w - x" is there to unmirror everything, figure out why it's needed.
-        vertices = [((x, y, -z, 1),
-                     self._get_float_color(*colors[subdata[x, y]]),
-                     (0, 0, 1, 0))
-                    for x, y in product(range(w), range(h))
-                    if subdata[x, y] > 0]
-        return vertices
-
     @lru_cache(1)
     def _get_mesh(self, drawing, rect, colors):
-        vertices = list(chain.from_iterable(self._get_layer_vertices(layer, rect, colors, i)
-                                            for i, layer in enumerate(drawing.layers)
-                                            if True))
+        nz = drawing.data.nonzero()
+        pixels = np.transpose(nz)
+        values = drawing.data[nz]
+        # TODO get rid of that "-z"
+        vertices = [((x, y, -z, 1), (v,), (0, 0, 1, 0))
+                    for (x, y, z), v in zip(pixels, values)]
         if vertices:
             return Mesh(data=vertices, vertices_class=VoxelVertices)
+
+    @lru_cache(1)
+    def _get_colors(self, palette):
+        colors = palette.colors
+        float_colors = chain.from_iterable((r / 255, g / 255, b / 255, a / 255)
+                                           for r, g, b, a in colors)
+        return (gl.GLfloat*(4*256))(*float_colors)
         
     def __call__(self, voxpaint, drawing, 
                  altitude: float=-2*math.pi/3, azimuth: float=0, spin: bool=False):
@@ -244,15 +243,15 @@ class Plugin:
                 azimuth = time() if spin else azimuth
                 view_matrix = (
                     Matrix4
-                    # .new_scale(2/w, 2/h, 1/max(w, h))
                     .new_translate(0, 0, -w)
                     .rotatex(altitude)
                     .rotatez(azimuth)  # Rotate over time
                 )
+                colors = self._get_colors(drawing.palette)
+                gl.glUniform4fv(3, 256, colors)
                 
                 gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
                                       gl_matrix(frust * view_matrix * model_matrix))
-
                 gl.glViewport(0, 0, vw, vh)
                 gl.glPointSize(1.0)
 
