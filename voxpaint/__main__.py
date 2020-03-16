@@ -66,7 +66,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.drawing = Drawing.from_ora(path)
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
-            self.drawing = Drawing((32, 32, 32), palette=Palette())
+            self.drawing = Drawing((128, 128, 128), palette=Palette())
         self.view = DrawingView(self.drawing)
 
         self.vao = VertexArrayObject()
@@ -311,6 +311,11 @@ class VoxpaintWindow(pyglet.window.Window):
                                        gl.GL_RGBA_INTEGER, gl.GL_UNSIGNED_BYTE, overlay_data)
                 overlay.dirty = None
                 overlay.lock.release()
+
+            # Set current palette
+            gl.glUniform4fv(2, 256, colors)
+
+            gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for reading 8bit data
             
             for i in range(d):
                 # TODO This is pretty slow, since we draw every layer every frame.
@@ -321,7 +326,6 @@ class VoxpaintWindow(pyglet.window.Window):
                 dirty = self.view.dirty[i]
                 if dirty and self.drawing.lock.acquire(timeout=0.01):
                     layer = data[:, :, i]
-                    gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for reading 8bit data
                     layer_data = layer.tobytes("F")  # TODO maybe there's a better way?
                     gl.glTextureSubImage2D(tex.name, 0, 0, 0, w, h,
                                            gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
@@ -334,7 +338,6 @@ class VoxpaintWindow(pyglet.window.Window):
                         second_texture = self._get_empty_texture(size)
                     with second_texture:
                         gl.glUniform1f(1, 1)
-                        gl.glUniform4fv(2, 256, colors)
                         gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
 
             gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
