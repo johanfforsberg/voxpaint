@@ -140,3 +140,34 @@ def render_layers(view):
         view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)
     
     imgui.end()
+
+
+def render_menu(window):
+
+    if imgui.begin_main_menu_bar():
+        
+        if imgui.begin_menu("File"):
+            ...
+            imgui.end_menu()
+
+        if imgui.begin_menu("Drawing"):
+            ...
+            imgui.end_menu()
+        
+        if imgui.begin_menu("Layer", window.drawing):
+            ...
+            imgui.end_menu()
+
+        if imgui.begin_menu("Brush", window.drawing):
+            ...
+            imgui.end_menu()
+
+        if imgui.begin_menu("Plugins", window.drawing):
+            ...
+            imgui.end_menu()
+
+        imgui.end_main_menu_bar()
+    else:
+        imgui.set_cursor_screen_pos(0, 0)
+        imgui.text("Hejsan")
+    

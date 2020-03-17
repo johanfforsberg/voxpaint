@@ -58,7 +58,7 @@ def render_plugins_ui(window):
         if not opened:
             deactivated.add(name)
         imgui.columns(2)
-        for param_name, param_sig in islice(sig.items(), 3, None):
+        for param_name, param_sig in islice(sig.items(), 2, None):
             imgui.text(param_name)
             imgui.next_column()
             default_value = args.get(param_name)

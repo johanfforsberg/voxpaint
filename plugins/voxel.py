@@ -80,20 +80,20 @@ out VS_OUT {
 
 void main(void) {
   const vec4 vertices[6] = vec4[6](vec4(-1, -1, 0, 1),
+                                   vec4(1, 1, 0, 1),
                                    vec4(1, -1, 0, 1),
-                                   vec4(1, 1, 0, 1),
 
-                                   vec4(-1, -1, 0, 1),
                                    vec4(1, 1, 0, 1),
+                                   vec4(-1, -1, 0, 1),
                                    vec4(-1, 1, 0, 1));
 
-  const vec2 texcoords[6] = vec2[6](vec2(0, 0),
+  const vec2 texcoords[6] = vec2[6](vec2(0, 1),
                                     vec2(1, 0),
                                     vec2(1, 1),
 
-                                    vec2(0, 0),
-                                    vec2(1, 1),
-                                    vec2(0, 1));
+                                    vec2(1, 0),
+                                    vec2(0, 1),
+                                    vec2(0, 0));
 
   gl_Position = vertices[gl_VertexID];
   vs_out.texcoord = texcoords[gl_VertexID];
@@ -196,9 +196,17 @@ class Plugin:
         nz = drawing.data.nonzero()
         pixels = np.transpose(nz)
         values = drawing.data[nz]
-        # TODO get rid of that "-z"
+        # TODO get rid of that "-z"?
         vertices = [((x, y, -z, 1), (v,), (0, 0, 1, 0))
                     for (x, y, z), v in zip(pixels, values)]
+        # TODO It should be possible to send an ndarray directly to the GPU for
+        # performance gain, but this requires support in fogl.buffer that I haven't
+        # cracked yet.
+        # dtype = np.dtype([('position', gl.GLfloat * 4),
+        #                   ('index', gl.GLubyte * 1),
+        #                   ('normal', gl.GLfloat * 4)])
+        # vertices = np.array([((x, y, -z, 1), (v,), (0, 0, 1, 0))
+        #                      for (x, y, z), v in zip(pixels, values)], dtype=dtype)
         if vertices:
             return Mesh(data=vertices, vertices_class=VoxelVertices)
 
@@ -210,7 +218,7 @@ class Plugin:
         return (gl.GLfloat*(4*256))(*float_colors)
         
     def __call__(self, voxpaint, drawing, 
-                 altitude: float=-2*math.pi/3, azimuth: float=0, spin: bool=False):
+                 altitude: float=2*math.pi/3, azimuth: float=0, spin: bool=False):
         if True:
             size = drawing.size
             depth = len(drawing.layers)
@@ -243,7 +251,7 @@ class Plugin:
                 azimuth = time() if spin else azimuth
                 view_matrix = (
                     Matrix4
-                    .new_translate(0, 0, -w)
+                    .new_translate(0, 0, -h)
                     .rotatex(altitude)
                     .rotatez(azimuth)  # Rotate over time
                 )

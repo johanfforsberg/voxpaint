@@ -137,8 +137,22 @@ class DrawingView:
         
     @property
     def data(self):
-        return self._get_view(self.rotation)
+        return self._get_data(self.rotation)
 
+    @lru_cache(1)
+    def _get_data(self, rotation):
+        " Return a ndarray view on the drawing data, rotated properly. "
+        data = self.drawing.data
+        rx, ry, rz = rotation
+        # TODO this seems correct for the limited rotating we currently do...
+        if rz:
+            data = np.rot90(data, rz, (0, 1))
+        if rx:
+            data = np.rot90(data, rx, (1, 2))
+        if ry:
+            data = np.rot90(data, ry, (2, 0))
+        return data
+                    
     @property
     def direction(self):
         return self._get_direction(self.rotation)
@@ -163,18 +177,6 @@ class DrawingView:
             v = v.rotate_around(zaxis, -rz * math.pi/2)
         return tuple(int(a) for a in v)
     
-    @lru_cache(1)
-    def _get_view(self, rotation):
-        data = self.drawing.data
-        rx, ry, rz = rotation
-        if rz:
-            data = np.rot90(data, rz, (0, 1))
-        if rx:
-            data = np.rot90(data, rx, (1, 2))
-        if ry:
-            data = np.rot90(data, ry, (2, 0))
-        return data
-                
     @property
     def shape(self):
         return self.data.shape
