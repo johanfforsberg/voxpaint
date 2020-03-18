@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Optional, Tuple, List
 import math
+import os
 from threading import RLock
 
 import numpy as np
@@ -19,7 +20,8 @@ Shape = Tuple[int, ...]
 
 class Drawing:
 
-    def __init__(self, size:Optional[Shape]=None, data:Optional[np.ndarray]=None, palette:Palette=None):
+    def __init__(self, size:Optional[Shape]=None, data:Optional[np.ndarray]=None, palette:Palette=None,
+                 path=None):
         if data is not None:
             self.data = data
         elif size:
@@ -29,6 +31,8 @@ class Drawing:
                 shape = size
             self.data = np.zeros(shape, dtype=np.uint8)
         self.palette = palette
+        self.path = path
+        self.filename = os.path.basename(path) if path else "[Unnamed]"
 
         self.lock = RLock()
 
@@ -54,12 +58,21 @@ class Drawing:
     @classmethod
     def from_ora(cls, path):
         data, info, _ = load_ora(path)
-        return cls(data=data, palette=Palette(info["palette"]))
+        return cls(data=data, palette=Palette(info["palette"]), path=path)
 
     def to_ora(self, path):
         view = self.get_view()
         layers = list(view.layers)
         save_ora(self.size, layers, self.palette, path)
+
+    def save(self, path=None):
+        self.path = path if path is not None else self.path
+        assert self.path, "Can't save drawing; no path set."
+        _, ext = os.path.splitext(self.path)
+        if ext == ".ora":
+            self.to_ora(self.path)
+        else:
+            raise ValueError(f"Can't save drawing; unknown format: {ext}")
 
     @property
     def layers(self):
@@ -99,7 +112,7 @@ class Drawing:
         return DrawingView(self, rotation)
 
     def __hash__(self):
-        return hash((id(self), self.data.shape, self.version))
+        return hash((id(self), self.data.shape))
         
     
 class DrawingView:

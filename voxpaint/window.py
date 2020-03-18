@@ -1,5 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
+from collections import OrderedDict
 from functools import lru_cache
+import os
 from queue import Queue
 
 import imgui
@@ -26,7 +28,8 @@ from .tool import (PencilTool, PointsTool, SprayTool,
                    LineTool, RectangleTool, EllipseTool,
                    SelectionTool, ColorPickerTool, LayerPickerTool, FillTool)
 from . import ui
-from .util import make_view_matrix, try_except_log, Selectable2, no_imgui_events
+from .util import (make_view_matrix, try_except_log, Selectable, Selectable2, no_imgui_events,
+                   show_load_dialog, show_save_dialog, cache_clear, debounce)
 
 
 vao = VertexArrayObject()
@@ -51,18 +54,19 @@ MAX_ZOOM = 5
 
 class VoxpaintWindow(pyglet.window.Window):
 
-    def __init__(self, *args, path=None, **kwargs):
+    def __init__(self, recent_files, *args, path=None, **kwargs):
         
         super().__init__(*args, **kwargs, resizable=True, vsync=False)
 
+        self.recent_files = OrderedDict((k, None) for k in recent_files)
+        
         if path:
-            self.drawing = Drawing.from_ora(path)
+            self.drawings = Selectable([Drawing.from_ora(path)])
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
-            self.drawing = Drawing((128, 128, 128), palette=Palette())
-        self.view = DrawingView(self.drawing)
-
-        self.vao = VertexArrayObject()
+            self.drawings = Selectable([Drawing((128, 128, 128), palette=Palette())])
+        self._views = {}
+        
         self.offset = (0, 0)
         self.zoom = 2
 
@@ -94,6 +98,8 @@ class VoxpaintWindow(pyglet.window.Window):
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.mouse_event_queue = None
 
+        self.vao = VertexArrayObject()
+        
         self.imgui_renderer = PygletRenderer(self)
         io = imgui.get_io()
         self._font = io.fonts.add_font_from_file_ttf(
@@ -110,7 +116,20 @@ class VoxpaintWindow(pyglet.window.Window):
         self.plugins = {}
         init_plugins(self)
         self.drawing.plugins = self.plugins
-        
+
+    @property
+    def drawing(self):
+        return self.drawings.current
+    
+    @property
+    def view(self):
+        view = self._views.get(self.drawing)
+        if view:
+            return view
+        view = self.drawing.get_view()
+        self._views[self.drawing] = view
+        return view
+
     @property
     def tool(self):
         return self.temp_tool or self.tools.current
@@ -168,31 +187,7 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_mouse_leave(self, x, y):
         if not self.stroke:
             self.overlay.clear_all()
-        
-    # @cache_clear(get_layer_preview_texture)
-    @try_except_log
-    def _finish_stroke(self, stroke):
-        "Callback that gets run every time a stroke is finished."
-        # Since this is a callback, stroke is a Future and is guaranteed to be finished.
-        # self.stroke_tool = None
-        tool = stroke.result()
-        if tool and tool.rect:
-            s = tool.rect.as_slice()
-            # src = self.view.overlay.data[s]
-            # dst = self.view.layer[s]
-            # print(dir(dst))
-            # np.copyto(dst, src, where=src > 255)
-            self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
-            self.view.overlay.clear(tool.rect)
-            self.view.dirty[self.view.layer_index] = tool.rect
-        else:
-            # If no rect is set, the tool is presumed to not have changed anything.
-            self.view.overlay.clear_all()
-        self.mouse_event_queue = None
-        self.stroke = None
-        # self.autosave_drawing()
-        print("Stroke finished")
-        
+                
     @no_imgui_events
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         "Callback for mouse movement with buttons held"
@@ -311,6 +306,30 @@ class VoxpaintWindow(pyglet.window.Window):
         self._render_view()
         self._render_gui()
 
+    # @cache_clear(get_layer_preview_texture)
+    @try_except_log
+    def _finish_stroke(self, stroke):
+        "Callback that gets run every time a stroke is finished."
+        # Since this is a callback, stroke is a Future and is guaranteed to be finished.
+        # self.stroke_tool = None
+        tool = stroke.result()
+        if tool and tool.rect:
+            s = tool.rect.as_slice()
+            # src = self.view.overlay.data[s]
+            # dst = self.view.layer[s]
+            # print(dir(dst))
+            # np.copyto(dst, src, where=src > 255)
+            self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
+            self.view.overlay.clear(tool.rect)
+            self.view.dirty[self.view.layer_index] = tool.rect
+        else:
+            # If no rect is set, the tool is presumed to not have changed anything.
+            self.view.overlay.clear_all()
+        self.mouse_event_queue = None
+        self.stroke = None
+        # self.autosave_drawing()
+        print("Stroke finished")
+        
     def _render_view(self):
         # gl.glClear(gl.GL_COLOR_BUFFER_BIT)
         gl.glClearBufferfv(gl.GL_COLOR, 0, (gl.GLfloat * 4)(0.25, 0.25, 0.25, 1))
@@ -349,12 +368,89 @@ class VoxpaintWindow(pyglet.window.Window):
         with imgui.font(self._font):
             ui.render_palette_popup(self.drawing)
             ui.render_layers(self.view)
+            ui.render_menu(self)
             render_plugins_ui(self)
             
         imgui.render()
         imgui.end_frame()
         self.imgui_renderer.render(imgui.get_draw_data())
+        
+    @try_except_log
+    def save_drawing(self, drawing=None, ask_for_path=False, auto=False):
+        "Save the drawing, asking for a file name if neccessary."
+        drawing = drawing or self.drawing
+        if not ask_for_path and drawing.path:
+            drawing.save()
+            self._add_recent_file(drawing.path)
+            # elif drawing.path.endswith(".png") and len(drawing.layers) == 1:
+            #     drawing.save_png()
+        else:
+            last_dir = self._get_latest_dir()
+            # The point here is to not block the UI redraws while showing the
+            # dialog. May be a horrible idea but it seems to work...
+            fut = self.executor.submit(show_save_dialog,
+                                       title="Select file",
+                                       initialdir=last_dir,
+                                       filetypes=(("ORA files", "*.ora"),
+                                                  # ("PNG files", "*.png"),
+                                                  ("all files", "*.*")))
 
+            def really_save_drawing(drawing, path):
+                try:
+                    if path:
+                        try:
+                            drawing.save(path)
+                            self._add_recent_file(path)
+                        except (AssertionError, ValueError) as e:
+                            print(e)
+                            self._error = str(e)
+                except OSError as e:
+                    self._error = f"Could not save:\n {e}"
+
+            fut.add_done_callback(
+                lambda fut: really_save_drawing(drawing, fut.result()))
+
+    def load_drawing(self, path=None):
+
+        def really_load_drawing(path):
+            if path:
+                if path.endswith(".ora"):
+                    drawing = Drawing.from_ora(path)
+                elif path.endswith(".png"):
+                    drawing = Drawing.from_png(path)
+                self.drawings.append(drawing)
+                self.drawings.select(drawing)
+                print("hej", drawing)
+                self._add_recent_file(path)
+
+        if path:
+            really_load_drawing(path)
+        else:
+            last_dir = self._get_latest_dir()
+            fut = self.executor.submit(show_load_dialog,
+                                       title="Select file",
+                                       initialdir=last_dir,
+                                       filetypes=(("All image files", "*.ora"),
+                                                  ("All image files", "*.png"),
+                                                  ("ORA files", "*.ora"),
+                                                  ("PNG files", "*.png"),
+                                                  ))
+            fut.add_done_callback(
+                lambda fut: really_load_drawing(fut.result()))
+            
+    def _get_latest_dir(self):
+        if self.recent_files:
+            f = list(self.recent_files.keys())[-1]
+            return os.path.dirname(f)
+
+    def _add_recent_file(self, filename, maxsize=10):
+        print("add recent file", filename)
+        self.recent_files[filename] = None
+        if len(self.recent_files) > maxsize:
+            for f in self.recent_files:
+                del self.recent_files[f]
+                break
+            
     @lru_cache(1)
     def _make_view_matrix(self, window_size, size, zoom, offset):
         return make_view_matrix(window_size, size, zoom, offset)

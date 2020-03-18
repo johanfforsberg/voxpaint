@@ -147,11 +147,35 @@ def render_menu(window):
     if imgui.begin_main_menu_bar():
         
         if imgui.begin_menu("File"):
-            ...
+
+            clicked_load, selected_load = imgui.menu_item("Load", "o", False, True)
+            if clicked_load:
+                window.load_drawing()
+
+            if imgui.begin_menu("Load recent...", window.recent_files):
+                for path in reversed(window.recent_files):
+                    clicked, _ = imgui.menu_item(os.path.basename(path), None, False, True)
+                    if clicked:
+                        window.load_drawing(path)
+                imgui.end_menu()
+
+            imgui.separator()
+            
+            clicked_save, selected_save = imgui.menu_item("Save", "Ctrl+s", False, window.drawing)
+            if clicked_save:
+                window.save_drawing()
+
+            clicked_save_as, selected_save = imgui.menu_item("Save as", None, False, window.drawing)
+            if clicked_save_as:
+                window.save_drawing(ask_for_path=True)               
+                
             imgui.end_menu()
 
         if imgui.begin_menu("Drawing"):
-            ...
+            for drawing in window.drawings:
+                clicked, _ = imgui.menu_item(drawing.filename, "", False, True)
+                if clicked:
+                    window.drawings.select(drawing)
             imgui.end_menu()
         
         if imgui.begin_menu("Layer", window.drawing):
@@ -163,7 +187,14 @@ def render_menu(window):
             imgui.end_menu()
 
         if imgui.begin_menu("Plugins", window.drawing):
-            ...
+            active_plugins = window.drawing.plugins.values()
+            for name, plugin in window.plugins.items():
+                is_active = plugin in active_plugins
+                clicked, selected = imgui.menu_item(name, None, is_active, True)
+                if selected:
+                    window.drawing.plugins[name] = plugin
+                elif is_active:
+                    del window.drawing.plugins[name]
             imgui.end_menu()
 
         imgui.end_main_menu_bar()
