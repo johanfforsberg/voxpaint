@@ -21,11 +21,11 @@ from fogl.util import enabled, disabled
 
 VERTEX_SHADER = b"""
 #version 450 core
-precision lowp float;
+precision highp float;
 
-layout (location = 0) in vec4 position;
+layout (location = 0) in ivec4 position;
 layout (location = 1) in uint color_index;
-layout (location = 2) in vec4 normal;
+layout (location = 2) in ivec4 normal;
 
 layout (location = 0) uniform mat4 proj_matrix;
 layout (location = 3) uniform vec4[256] palette;
@@ -124,10 +124,10 @@ void main(void) {
 
 class VoxelVertices(Vertices):
     _fields = [
-        ('position', gl.GL_FLOAT, 4),
+        ('position', gl.GL_INT, 4),
         ('color', gl.GL_UNSIGNED_BYTE, 1),
-        ('normal', gl.GL_FLOAT, 4),
-    ]    
+        ('normal', gl.GL_INT, 4),
+    ]
 
 
 class Plugin:
@@ -136,7 +136,6 @@ class Plugin:
     Show the current selection of the drawing as a three dimensional object.
     """
 
-    # TODO: Keep internal rect instead of relying on drawing selection (maybe use it initially)
     # TODO: Better shading, lighting
     # TODO: Alternative rendering method, e.g. blocks
     # TODO: Highlight current layer somehow
@@ -192,7 +191,7 @@ class Plugin:
         return r/255, g/255, b/255, a/255
 
     @lru_cache(1)
-    def _get_mesh(self, drawing, rect, colors):
+    def _get_mesh(self, drawing, version, rect, colors):
         nz = drawing.data.nonzero()
         pixels = np.transpose(nz)
         values = drawing.data[nz]
@@ -207,7 +206,7 @@ class Plugin:
         #                   ('normal', gl.GLfloat * 4)])
         # vertices = np.array([((x, y, -z, 1), (v,), (0, 0, 1, 0))
         #                      for (x, y, z), v in zip(pixels, values)], dtype=dtype)
-        if vertices:
+        if len(vertices):
             return Mesh(data=vertices, vertices_class=VoxelVertices)
 
     @lru_cache(1)
@@ -218,81 +217,88 @@ class Plugin:
         return (gl.GLfloat*(4*256))(*float_colors)
         
     def __call__(self, voxpaint, drawing, 
-                 altitude: float=2*math.pi/3, azimuth: float=0, spin: bool=False):
-        if True:
-            size = drawing.size
-            depth = len(drawing.layers)
-            colors = drawing.palette.as_tuple()
+                 altitude: float=120, azimuth: float=45, spin: bool=False, z: int=100):
 
-            mesh = self._get_mesh(drawing, drawing.rect, colors)
-            if not mesh:
-                # TODO hacky
-                self.texture and self.texture[0].clear()
-                return
+        size = drawing.size
+        depth = len(drawing.layers)
+        colors = drawing.palette.as_tuple()
 
-            w, h = size
-            vw = w + 8
-            vh = h + h // 2
-            view_size = (vw, vh)
-            model_matrix = Matrix4.new_translate(-w/2, -h/2, depth/2).scale(1, 1, 1/math.sin(math.pi/3))
+        x = math.sin(math.pi/3)
+        
+        altitude = math.radians(altitude)
+        azimuth = math.radians(azimuth)
+        
+        mesh = self._get_mesh(drawing, drawing.version, drawing.rect, colors)
+        if not mesh:
+            # TODO hacky
+            self.texture and self.texture[0].clear()
+            return
 
-            far = w*2
-            near = 0
-            frust = Matrix4()
-            frust[:] = (2/vw, 0, 0, 0,
-                        0, 2/vh, 0, 0,
-                        0, 0, -2/(far-near), 0,
-                        0, 0, -(far+near)/(far-near), 1)
-            
-            offscreen_buffer = self._get_buffer(view_size)
-            with offscreen_buffer, self.program, \
-                    enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
+        w, h = size
+        vw = int(w * math.sqrt(2))
+        vh = int(h + math.sqrt(2) * h // 2)
+        view_size = (vw, vh)
+        model_matrix = (Matrix4
+                        .new_scale(1, 1, 1/x)
+                        .translate(-w//2, -h//2, depth//2 - 1/2))
 
-                azimuth = time() if spin else azimuth
-                view_matrix = (
-                    Matrix4
-                    .new_translate(0, 0, -h)
-                    .rotatex(altitude)
-                    .rotatez(azimuth)  # Rotate over time
-                )
-                colors = self._get_colors(drawing.palette)
-                gl.glUniform4fv(3, 256, colors)
-                
-                gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
-                                      gl_matrix(frust * view_matrix * model_matrix))
-                gl.glViewport(0, 0, vw, vh)
-                gl.glPointSize(1.0)
+        far = w*2
+        near = -w*2
+        frust = Matrix4()
+        frust[:] = (2/vw, 0, 0, 0,
+                    0, 2/vh, 0, 0,
+                    0, 0, -2/(far-near), 0,
+                    0, 0, -(far+near)/(far-near), 1)
 
-                mesh.draw(mode=gl.GL_POINTS)
+        offscreen_buffer = self._get_buffer(view_size)
+        with offscreen_buffer, self.program, \
+                enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
 
-            shadow_buffer = self._get_shadow_buffer(view_size)                
-            with shadow_buffer, self.program, \
-                    enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
-                view_matrix = (
-                    Matrix4
-                    # .new_scale(2/w, 2/h, 1/max(w, h))
-                    .new_translate(0, 0, -5)
-                    .rotatex(math.pi)
-                    .rotatez(azimuth)  # Rotate over time
-                )
-                gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
-                                      gl_matrix(frust * view_matrix * model_matrix))
+            azimuth = time() if spin else azimuth
+            view_matrix = (
+                Matrix4
+                .new_translate(0, 0, -1)
+                .rotatex(altitude)
+                .rotatez(azimuth)  # Rotate over time
+            )
+            colors = self._get_colors(drawing.palette)
+            gl.glUniform4fv(3, 256, colors)
 
-                gl.glViewport(0, 0, vw, vh)
-                gl.glPointSize(1.0)
+            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
+                                  gl_matrix(frust * view_matrix * model_matrix))
+            gl.glViewport(0, 0, vw, vh)
+            gl.glPointSize(1)
 
-                mesh.draw(mode=gl.GL_POINTS)
+            mesh.draw(mode=gl.GL_POINTS)
 
-            final_buffer = self._get_final_buffer(view_size)
-            
-            with self._vao, final_buffer, self._copy_program, disabled(gl.GL_CULL_FACE, gl.GL_DEPTH_TEST):
-                with offscreen_buffer["color"], offscreen_buffer["normal"], offscreen_buffer["position"], shadow_buffer["depth"]:
-                    gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
-                
-            # TODO must be careful here so that the texture is always valid
-            # (since imgui may read it at any time) Find a way to ensure this.
-            texture = self._get_texture(view_size)
-            gl.glCopyImageSubData(final_buffer["color"].name, gl.GL_TEXTURE_2D, 0, 0, 0, 0,
-                                  texture.name, gl.GL_TEXTURE_2D, 0, 0, 0, 0,
-                                  vw, vh, 1)
-            self.texture = texture, view_size
+        shadow_buffer = self._get_shadow_buffer(view_size)                
+        with shadow_buffer, self.program, \
+                enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
+            view_matrix = (
+                Matrix4
+                # .new_scale(2/w, 2/h, 1/max(w, h))
+                .new_translate(0, 0, 1)
+                .rotatex(math.pi)
+                .rotatez(azimuth)  # Rotate over time
+            )
+            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
+                                  gl_matrix(frust * view_matrix * model_matrix))
+
+            gl.glViewport(0, 0, vw, vh)
+            gl.glPointSize(1.0)
+
+            mesh.draw(mode=gl.GL_POINTS)
+
+        final_buffer = self._get_final_buffer(view_size)
+
+        with self._vao, final_buffer, self._copy_program, disabled(gl.GL_CULL_FACE, gl.GL_DEPTH_TEST):
+            with offscreen_buffer["color"], offscreen_buffer["normal"], offscreen_buffer["position"], shadow_buffer["depth"]:
+                gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
+
+        # TODO must be careful here so that the texture is always valid
+        # (since imgui may read it at any time) Find a way to ensure this.
+        texture = self._get_texture(view_size)
+        gl.glCopyImageSubData(final_buffer["color"].name, gl.GL_TEXTURE_2D, 0, 0, 0, 0,
+                              texture.name, gl.GL_TEXTURE_2D, 0, 0, 0, 0,
+                              vw, vh, 1)
+        self.texture = texture, view_size
