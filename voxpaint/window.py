@@ -373,6 +373,7 @@ class VoxpaintWindow(pyglet.window.Window):
             ui.render_palette_popup(self.drawing)
             ui.render_layers(self.view)
             ui.render_menu(self)
+            ui.render_new_drawing_popup(self)
             render_plugins_ui(self)
             
         imgui.render()
@@ -424,7 +425,6 @@ class VoxpaintWindow(pyglet.window.Window):
                     drawing = Drawing.from_png(path)
                 self.drawings.append(drawing)
                 self.drawings.select(drawing)
-                print("hej", drawing)
                 self._add_recent_file(path)
 
         if path:
@@ -441,6 +441,17 @@ class VoxpaintWindow(pyglet.window.Window):
                                                   ))
             fut.add_done_callback(
                 lambda fut: really_load_drawing(fut.result()))
+
+    _new_drawing = None
+            
+    def create_drawing(self):
+        shape = self.drawing.shape if self.drawing else (64, 64, 64)
+        self._new_drawing = dict(shape=shape)
+
+    def really_create_drawing(self):
+        drawing = Drawing(size=self._new_drawing["shape"])
+        self.drawings.append(drawing)
+        self._new_drawing = None        
             
     def _get_latest_dir(self):
         if self.recent_files:

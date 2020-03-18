@@ -172,6 +172,13 @@ def render_menu(window):
             imgui.end_menu()
 
         if imgui.begin_menu("Drawing"):
+
+            clicked, _ = imgui.menu_item("New", "", False, True)
+            if clicked:
+                window.create_drawing()
+            
+            imgui.separator()
+            
             for drawing in window.drawings:
                 clicked, _ = imgui.menu_item(drawing.filename, "", False, True)
                 if clicked:
@@ -212,3 +219,41 @@ def render_menu(window):
                 imgui.text(f"{int(x): >3},{int(y): >3},{window.view.layer_index: >3}")
 
         imgui.end_main_menu_bar()                
+
+        
+def render_new_drawing_popup(window):
+
+    if window._new_drawing:
+        imgui.open_popup("New drawing")
+        w, h = window.get_size()
+        imgui.set_next_window_size(200, 120)
+        imgui.set_next_window_position(w // 2 - 100, h // 2 - 60)
+
+    if imgui.begin_popup_modal("New drawing")[0]:
+        imgui.text("Creating a new drawing.")
+        imgui.separator()
+        changed, new_size = imgui.drag_int3("Shape", *window._new_drawing["shape"],
+                                            min_value=1, max_value=2048)
+        if changed:
+            window._new_drawing["shape"] = new_size
+        if imgui.button("OK"):
+            window.really_create_drawing()
+            imgui.close_current_popup()
+        imgui.same_line()
+        if imgui.button("Cancel"):
+            window._new_drawing = None
+            imgui.close_current_popup()
+        imgui.end_popup()
+
+        
+def render_errors(window):
+    
+    if window._error:
+        imgui.open_popup("Error")
+        if imgui.begin_popup_modal("Error")[0]:
+            imgui.text(window._error)
+            if imgui.button("Doh!"):
+                window._error = None
+                imgui.close_current_popup()
+            imgui.end_popup()
+    

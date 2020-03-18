@@ -30,7 +30,7 @@ class Drawing:
             elif len(size) == 3:
                 shape = size
             self.data = np.zeros(shape, dtype=np.uint8)
-        self.palette = palette
+        self.palette = palette or Palette()
         self.path = path
         self.filename = os.path.basename(path) if path else "[Unnamed]"
 
@@ -47,6 +47,10 @@ class Drawing:
     def size(self):
         return self.data.shape[:2]
 
+    @property
+    def shape(self):
+        return self.data.shape
+    
     @property
     def rect(self):
         return self._get_rect(self.data.shape)
