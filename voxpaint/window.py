@@ -175,7 +175,7 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_mouse_release(self, x, y, button, modifiers):
         if self.mouse_event_queue:
             x, y = self._to_image_coords(x, y)
-            pos = int(x), int(y)
+            pos = x, y
             self.mouse_event_queue.put(("mouse_up", pos, button, modifiers))
 
     def on_mouse_motion(self, x, y, dx, dy):
@@ -198,7 +198,7 @@ class VoxpaintWindow(pyglet.window.Window):
         if self.stroke:
             # Add to ongoing stroke
             x, y = self._to_image_coords(x, y)
-            ipos = int(x), int(y)
+            ipos = x, y
             self.mouse_event_queue.put(("mouse_drag", ipos, button, modifiers))
         elif button == pyglet.window.mouse.MIDDLE:
             # Pan image
@@ -500,18 +500,23 @@ class VoxpaintWindow(pyglet.window.Window):
     
     @try_except_log
     def _draw_brush_preview(self, x0, y0, x, y):
-        # io = imgui.get_io()
-        # if io.want_capture_mouse:
-        #     return
+        
         if self.stroke:  # or not self._over_image(x, y):
             return
+        
+        # TODO This is pretty crude; keep track of the preview to be able to clear it.
         ix0, iy0 = self._to_image_coords(x0, y0)
-        ix, iy = self._to_image_coords(x, y)
         brush = self.brush
         bw, bh = brush.size
         cx, cy = brush.center
-        old_rect = Rectangle((ix0 - cx, iy0 - cy), brush.size)
+        old_rect = Rectangle((int(ix0 - cx), int(iy0 - cy)), brush.size)
         self.overlay.clear(old_rect)
+
+        io = imgui.get_io()
+        if io.want_capture_mouse:
+            return
+        
+        ix, iy = self._to_image_coords(x, y)
         pos = (ix, iy)
         self.overlay.blit_brush(brush, pos, self.drawing.palette.foreground)
     
@@ -530,7 +535,6 @@ class VoxpaintWindow(pyglet.window.Window):
         yw0 = (h2 - y0) / h
         xw1 = (x1 - w2) / w
         yw1 = (h2 - y1) / h
-        print(xw0, yw0, xw1, yw1)
         self.border_vertices.vertex_buffer.write([
             ((xw0, yw0, 0),),
             ((xw1, yw0, 0),),

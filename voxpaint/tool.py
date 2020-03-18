@@ -76,7 +76,7 @@ class PencilTool(Tool):
 
     def finish(self, view, point, buttons, modifiers):
         # Make sure we draw a point even if the mouse was never moved
-        rect = view.overlay.draw_line(self.brush, self.points[-1], point, self.color)
+        rect = view.overlay.blit_brush(self.brush, point, self.color)
         if rect:
             self.rect = rect.unite(self.rect)
 

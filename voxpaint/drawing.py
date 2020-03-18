@@ -307,8 +307,9 @@ class Overlay:
     def blit_brush(self, brush, p, color=0):
         x, y = p
         dx, dy = brush.center
+        # dx, dy = 0, 0
         data = brush.get_draw_data(color)
-        return self.blit(data, (x - dx, y - dy))
+        return self.blit(data, (int(x - dx), int(y - dy)))
 
     def blit(self, data, p):
         x, y = p
@@ -323,13 +324,14 @@ class Overlay:
         dx, dy = brush.center
         data = brush.get_draw_data(color)
         with self.lock:
-            rect = draw_line(self.data, data, (x0-dx, y0-dy), (x1-dx, y1-dy))
+            rect = draw_line(self.data, data, (int(x0-dx), int(y0-dy)), (int(x1-dx), int(y1-dy)))
         self.dirty = rect.unite(self.dirty)
         return rect
 
     def draw_rectangle(self, brush, pos, size, color=0, fill=False):
         x, y = pos
         dx, dy = brush.center
+        # dx = dy = 0
         data = brush.get_draw_data(color)
         with self.lock:
             rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
@@ -337,12 +339,12 @@ class Overlay:
             self.dirty = rect.unite(self.dirty)
         return rect
     
-    def draw_ellipse(self, brush, pos, size, color=0, fill=False):
-        x, y = pos
-        dx, dy = brush.center
-        data = brush.get_draw_data(color)
-        with self.lock:
-            rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
-        self.dirty = rect.unite(self.dirty)
-        return rect
+    # def draw_ellipse(self, brush, pos, size, color=0, fill=False):
+    #     x, y = pos
+    #     dx, dy = brush.center
+    #     data = brush.get_draw_data(color)
+    #     with self.lock:
+    #         rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
+    #     self.dirty = rect.unite(self.dirty)
+    #     return rect
     
