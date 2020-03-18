@@ -95,6 +95,8 @@ class VoxpaintWindow(pyglet.window.Window):
         self._brush = Brush((1, 1))
         self.stroke = None
 
+        self.mouse_position = None
+
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.mouse_event_queue = None
 
@@ -183,10 +185,12 @@ class VoxpaintWindow(pyglet.window.Window):
         # self._update_cursor(x, y)
         if self.tool.brush_preview:
             self._draw_brush_preview(x - dx, y - dy, x, y)
+        self.mouse_position = x, y
 
     def on_mouse_leave(self, x, y):
         if not self.stroke:
             self.overlay.clear_all()
+        self.mouse_position = None
                 
     @no_imgui_events
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):

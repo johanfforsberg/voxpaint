@@ -197,8 +197,18 @@ def render_menu(window):
                     del window.drawing.plugins[name]
             imgui.end_menu()
 
-        imgui.end_main_menu_bar()
-    else:
-        imgui.set_cursor_screen_pos(0, 0)
-        imgui.text("Hejsan")
-    
+        w, h = window.get_size()
+        imgui.set_cursor_screen_pos((w // 2, 0))
+        drawing = window.drawing
+        if drawing:
+            imgui.text(f"{drawing.filename} {drawing.size}")
+
+            imgui.set_cursor_screen_pos((w - 270, 0))
+            imgui.text(f"Zoom: x{2**window.zoom}")
+            
+            if window.mouse_position:
+                imgui.set_cursor_screen_pos((w - 150, 0))
+                x, y = window._to_image_coords(*window.mouse_position)
+                imgui.text(f"{int(x): >3},{int(y): >3},{window.view.layer_index: >3}")
+
+        imgui.end_main_menu_bar()                
