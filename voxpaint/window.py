@@ -64,7 +64,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.drawings = Selectable([Drawing.from_ora(path)])
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
-            self.drawings = Selectable([Drawing((128, 128, 128), palette=Palette())])
+            self.drawings = Selectable([Drawing((32, 32, 32), palette=Palette())])
         self._views = {}
         
         self.offset = (0, 0)

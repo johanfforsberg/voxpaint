@@ -9,7 +9,7 @@ from euclid3 import Vector3, Matrix4
 
 from .brush import ImageBrush
 from .draw import blit, draw_line, draw_rectangle
-from .edit import LayerEdit
+from .edit import LayerEdit, PaletteEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
@@ -92,6 +92,13 @@ class Drawing:
         self.undos.append(edit)
         np.copyto(layer[slc], data, where=data > 255)
         self.redos.clear()
+        self.version += 1
+
+    def change_colors(self, start_i, *colors):
+        orig_colors = self.palette._colors[start_i:start_i+len(colors)]
+        edit = PaletteEdit(start_i, orig_colors, colors)
+        self.undos.append(edit)
+        edit.perform(self)
         self.version += 1
         
     def undo(self):

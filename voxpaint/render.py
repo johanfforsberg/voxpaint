@@ -28,7 +28,7 @@ def render_view(window):
     w, h, d = view.shape
     size = w, h
     ob = _get_offscreen_buffer(size)
-    colors = _get_colors(drawing.palette)
+    colors = _get_colors(drawing.palette.colors)
     
     gl.glClearBufferfv(gl.GL_COLOR, 0, (gl.GLfloat * 4)(0.25, 0.25, 0.25, 1))
 
@@ -117,8 +117,7 @@ def _get_empty_texture(size):
 
 
 @lru_cache(1)
-def _get_colors(palette):
-    colors = palette.colors
+def _get_colors(colors):
     float_colors = chain.from_iterable((r / 255, g / 255, b / 255, a / 255)
                                        for r, g, b, a in colors)
     return (gl.GLfloat*(4*256))(*float_colors)

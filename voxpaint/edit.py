@@ -3,8 +3,12 @@ import numpy as np
 import zlib
 
 
+class Edit:
+    pass
+
+
 @dataclass(frozen=True)
-class LayerEdit:
+class LayerEdit(Edit):
     
     index: int
     slc: tuple
@@ -43,3 +47,21 @@ class LayerEdit:
         view = drawing.get_view(rotation=self.rotation)
         layer = view.layer(self.index)
         np.copyto(layer[slc], data)
+
+
+@dataclass(frozen=True)
+class PaletteEdit(Edit):
+
+    "A change in the color data of the palette."
+
+    start_index: int
+    orig_data: tuple
+    data: tuple
+
+    def perform(self, drawing):
+        drawing.palette.set_colors(self.start_index, self.data)
+        
+    def revert(self, drawing):
+        drawing.palette.set_colors(self.start_index, self.orig_data)
+
+
