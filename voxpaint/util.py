@@ -110,24 +110,27 @@ class Selectable:
 class Selectable2:
 
     def __init__(self, items: dict):
-        self.items = items
+        self._items = items
         self._current_key = list(items.keys())[0]
         self._last = []
 
     @property
     def current(self):
-        return self.items[self._current_key]
+        return self._items[self._current_key]
 
     def select(self, key):
-        print(self.items)
-        assert key in self.items
+        print(self._items)
+        assert key in self._items
         try:
             self._last.remove(key)
         except ValueError:
             pass
         self._last.append(key)
         self._current_key = key        
-        
+
+    def __iter__(self):
+        return iter(self._items.values())
+    
 
 def throttle(interval=0.1):
     """

@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 from functools import lru_cache
+from typing import Tuple
 import os
 from queue import Queue
 
@@ -64,7 +65,7 @@ class VoxpaintWindow(pyglet.window.Window):
             self.drawings = Selectable([Drawing.from_ora(path)])
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
-            self.drawings = Selectable([Drawing((32, 32, 32), palette=Palette())])
+            self.drawings = Selectable()
         self._views = {}
         
         self.offset = (0, 0)
@@ -117,7 +118,6 @@ class VoxpaintWindow(pyglet.window.Window):
 
         self.plugins = {}
         init_plugins(self)
-        self.drawing.plugins = self.plugins
 
     @property
     def drawing(self):
@@ -125,6 +125,8 @@ class VoxpaintWindow(pyglet.window.Window):
     
     @property
     def view(self):
+        if not self.drawing:
+            return
         view = self._views.get(self.drawing)
         if view:
             return view
@@ -138,11 +140,13 @@ class VoxpaintWindow(pyglet.window.Window):
 
     @property
     def overlay(self):
-        return self.view.overlay
+        if self.drawing:
+            return self.view.overlay
 
     @property
     def brush(self):
-        return self.view.brushes[-1] if self.view.brushes else self._brush
+        if self.drawing:
+            return self.view.brushes[-1] if self.view.brushes else self._brush
     
     @no_imgui_events
     def on_mouse_press(self, x, y, button, modifiers):
@@ -175,7 +179,7 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_mouse_release(self, x, y, button, modifiers):
         if self.mouse_event_queue:
             x, y = self._to_image_coords(x, y)
-            pos = x, y
+            pos = int(x), int(y)
             self.mouse_event_queue.put(("mouse_up", pos, button, modifiers))
 
     def on_mouse_motion(self, x, y, dx, dy):
@@ -188,7 +192,7 @@ class VoxpaintWindow(pyglet.window.Window):
         self.mouse_position = x, y
 
     def on_mouse_leave(self, x, y):
-        if not self.stroke:
+        if not self.stroke and self.drawing:
             self.overlay.clear_all()
         self.mouse_position = None
                 
@@ -198,7 +202,7 @@ class VoxpaintWindow(pyglet.window.Window):
         if self.stroke:
             # Add to ongoing stroke
             x, y = self._to_image_coords(x, y)
-            ipos = x, y
+            ipos = int(x), int(y)
             self.mouse_event_queue.put(("mouse_drag", ipos, button, modifiers))
         elif button == pyglet.window.mouse.MIDDLE:
             # Pan image
@@ -287,10 +291,10 @@ class VoxpaintWindow(pyglet.window.Window):
 
         elif symbol in {key.LSHIFT, key.RSHIFT}:
             self.temp_tool = LayerPickerTool
-            self.overlay.clear_all()
+            self.overlay and self.overlay.clear_all()
         elif symbol in {key.LCTRL, key.RCTRL}:
             self.temp_tool = ColorPickerTool
-            self.overlay.clear_all()
+            self.overlay and self.overlay.clear_all()
             
         elif symbol == key.F4:
             init_plugins(self)
@@ -300,10 +304,12 @@ class VoxpaintWindow(pyglet.window.Window):
         print("release", symbol, modifiers)        
         
         if symbol in {key.S, key.W}:
-            self.view.layer_being_switched = False
+            if self.view:
+                self.view.layer_being_switched = False
             
         elif symbol in {key.LSHIFT, key.RSHIFT, key.LCTRL, key.RCTRL}:
-            self.view.layer_being_switched = False
+            if self.view:
+                self.view.layer_being_switched = False
             self.temp_tool = None
             
     def on_draw(self):
@@ -319,10 +325,6 @@ class VoxpaintWindow(pyglet.window.Window):
         tool = stroke.result()
         if tool and tool.rect:
             s = tool.rect.as_slice()
-            # src = self.view.overlay.data[s]
-            # dst = self.view.layer[s]
-            # print(dir(dst))
-            # np.copyto(dst, src, where=src > 255)
             self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
             self.view.overlay.clear(tool.rect)
             self.view.dirty[self.view.layer_index] = tool.rect
@@ -335,8 +337,12 @@ class VoxpaintWindow(pyglet.window.Window):
         print("Stroke finished")
         
     def _render_view(self):
-        # gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+
         gl.glClearBufferfv(gl.GL_COLOR, 0, (gl.GLfloat * 4)(0.25, 0.25, 0.25, 1))
+
+        if not self.view:
+            return
+        
         w, h, d = self.view.shape
         size = w, h
         window_size = self.get_size()
@@ -370,12 +376,32 @@ class VoxpaintWindow(pyglet.window.Window):
         
         imgui.new_frame()
         with imgui.font(self._font):
-            ui.render_palette_popup(self.drawing)
-            ui.render_layers(self.view)
-            ui.render_menu(self)
-            ui.render_new_drawing_popup(self)
-            render_plugins_ui(self)
             
+            ui.render_menu(self)
+
+            if self.drawing:
+            
+                imgui.set_next_window_size(115, h - 20)
+                imgui.set_next_window_position(w - 115, 20)
+
+                imgui.begin("Sidebar", False, flags=(imgui.WINDOW_NO_TITLE_BAR
+                                                     | imgui.WINDOW_NO_RESIZE
+                                                     | imgui.WINDOW_NO_MOVE))
+
+                ui.render_tools(self.tools, self.icons)
+                imgui.separator()
+
+                ui.render_palette(self.drawing)
+                imgui.separator()
+                
+                ui.render_layers(self.view)
+
+                imgui.end()
+                
+                render_plugins_ui(self)
+                
+            ui.render_new_drawing_popup(self)
+
         imgui.render()
         imgui.end_frame()
         self.imgui_renderer.render(imgui.get_draw_data())
@@ -471,7 +497,7 @@ class VoxpaintWindow(pyglet.window.Window):
         return make_view_matrix(window_size, size, zoom, offset)
         
     @lru_cache(1)
-    def _to_image_coords(self, x, y):
+    def _to_image_coords(self, x: float, y: float) -> Tuple[float, float]:
         "Convert window coordinates to image coordinates."
         w, h, _ = self.view.shape
         ww, wh = self.get_size()
@@ -481,7 +507,7 @@ class VoxpaintWindow(pyglet.window.Window):
         iy = -(y - (wh / 2 + oy)) / scale + h / 2
         return ix, iy
 
-    def _to_window_coords(self, x, y):
+    def _to_window_coords(self, x: float, y: float) -> Tuple[float, float]:
         "Convert image coordinates to window coordinates"
         w, h, _ = self.view.shape
         ww, wh = self.get_size()
@@ -500,10 +526,13 @@ class VoxpaintWindow(pyglet.window.Window):
     
     @try_except_log
     def _draw_brush_preview(self, x0, y0, x, y):
+
+        if not self.drawing:
+            return
         
         if self.stroke:  # or not self._over_image(x, y):
             return
-        
+
         # TODO This is pretty crude; keep track of the preview to be able to clear it.
         ix0, iy0 = self._to_image_coords(x0, y0)
         brush = self.brush
@@ -517,7 +546,7 @@ class VoxpaintWindow(pyglet.window.Window):
             return
         
         ix, iy = self._to_image_coords(x, y)
-        pos = (ix, iy)
+        pos = (int(ix), int(iy))
         self.overlay.blit_brush(brush, pos, self.drawing.palette.foreground)
     
     @lru_cache(1)
