@@ -376,7 +376,9 @@ def render_layers(view):
     if changed:
         delta = new_index - index
         view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)
-    
+
+    view.layer_being_switched = imgui.is_item_hovered()
+        
 
 def render_menu(window):
 
