@@ -73,7 +73,6 @@ void main(void) {
 COPY_VERTEX_SHADER = b"""
 #version 450 core
 
-
 out VS_OUT {
   vec2 texcoord;
 } vs_out;
@@ -125,9 +124,14 @@ void main(void) {
 class VoxelVertices(Vertices):
     _fields = [
         ('position', gl.GL_INT, 4),
-        ('color', gl.GL_UNSIGNED_BYTE, 1),
+        ('color', gl.GL_UNSIGNED_INT, 1),
         ('normal', gl.GL_INT, 4),
     ]
+
+
+vertex_dtype = np.dtype([('position', gl.GLint * 4),
+                         ('index', gl.GLuint * 1),
+                         ('normal', gl.GLint * 4)])
 
 
 class Plugin:
@@ -191,27 +195,22 @@ class Plugin:
         return r/255, g/255, b/255, a/255
 
     @lru_cache(1)
-    def _get_mesh(self, drawing, version, rect, colors):
+    def _get_mesh(self, drawing, version):
         nz = drawing.data.nonzero()
         pixels = np.transpose(nz)
         values = drawing.data[nz]
         # TODO get rid of that "-z"?
-        vertices = [((x, y, -z, 1), (v,), (0, 0, 1, 0))
-                    for (x, y, z), v in zip(pixels, values)]
-        # TODO It should be possible to send an ndarray directly to the GPU for
-        # performance gain, but this requires support in fogl.buffer that I haven't
-        # cracked yet.
-        # dtype = np.dtype([('position', gl.GLfloat * 4),
-        #                   ('index', gl.GLubyte * 1),
-        #                   ('normal', gl.GLfloat * 4)])
-        # vertices = np.array([((x, y, -z, 1), (v,), (0, 0, 1, 0))
-        #                      for (x, y, z), v in zip(pixels, values)], dtype=dtype)
+        # TODO This comprehension should be replaced with pure numpy operations
+        vertices = np.array([((x, y, -z, 1), (v, ), (0, 0, 1, 0))
+                             for (x, y, z), v in zip(pixels, values)],
+                            dtype=vertex_dtype)
         if len(vertices):
+            # TODO probably would be better to not allocate new memory every time
+            # but then we have to somehow handle that the size can vary.
             return Mesh(data=vertices, vertices_class=VoxelVertices)
 
     @lru_cache(1)
-    def _get_colors(self, palette):
-        colors = palette.colors
+    def _get_colors(self, colors):
         float_colors = chain.from_iterable((r / 255, g / 255, b / 255, a / 255)
                                            for r, g, b, a in colors)
         return (gl.GLfloat*(4*256))(*float_colors)
@@ -221,14 +220,14 @@ class Plugin:
 
         size = drawing.size
         depth = len(drawing.layers)
-        colors = drawing.palette.as_tuple()
+        colors = drawing.palette.colors
 
         x = math.sin(math.pi/3)
         
         altitude = math.radians(altitude)
         azimuth = math.radians(azimuth)
         
-        mesh = self._get_mesh(drawing, drawing.version, drawing.rect, colors)
+        mesh = self._get_mesh(drawing, drawing.version)
         if not mesh:
             # TODO hacky
             self.texture and self.texture[0].clear()
@@ -261,7 +260,7 @@ class Plugin:
                 .rotatex(altitude)
                 .rotatez(azimuth)  # Rotate over time
             )
-            colors = self._get_colors(drawing.palette)
+            colors = self._get_colors(colors)
             gl.glUniform4fv(3, 256, colors)
 
             gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
