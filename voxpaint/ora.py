@@ -13,8 +13,6 @@ from xml.etree import ElementTree as ET
 import numpy as np
 import png
 
-# from .picture import LongPicture, load_png, save_png
-
 
 def save_png(data, dest, palette=None):
     w, h = data.shape
