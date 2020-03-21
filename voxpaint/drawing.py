@@ -351,7 +351,7 @@ class Overlay:
         if rect:
             self.dirty = rect.unite(self.dirty)
         return rect
-    
+
     # def draw_ellipse(self, brush, pos, size, color=0, fill=False):
     #     x, y = pos
     #     dx, dy = brush.center

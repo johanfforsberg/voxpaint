@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 from functools import lru_cache
 from typing import Tuple
+from traceback import print_exc
 import os
 from queue import Queue
 
@@ -201,10 +202,8 @@ class VoxpaintWindow(pyglet.window.Window):
         self.mouse_event_queue = None
         self.stroke = None
         if tool.restore_last:
-            print("restoring")
             self.tools.restore()
         # self.autosave_drawing()
-        print("Stroke finished")
             
     def on_mouse_release(self, x, y, button, modifiers):
         if self.mouse_event_queue:
@@ -360,7 +359,6 @@ class VoxpaintWindow(pyglet.window.Window):
         if self.stroke_tool and self.stroke_tool.show_rect:
             if self.stroke_tool.rect:
                 self._update_tool_rect(self.stroke_tool.rect)
-                print(self.stroke_tool.rect)
                 with self.tool_rect_vao, line_program:
                     gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
                     gl.glUniform3f(1, 1., 1., 0.)
@@ -430,7 +428,7 @@ class VoxpaintWindow(pyglet.window.Window):
                             drawing.save(path)
                             self._add_recent_file(path)
                         except (AssertionError, ValueError) as e:
-                            print(e)
+                            print_exc()
                             self._error = str(e)
                 except OSError as e:
                     self._error = f"Could not save:\n {e}"

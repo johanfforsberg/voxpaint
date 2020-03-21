@@ -26,7 +26,6 @@ class Tool(metaclass=abc.ABCMeta):
     restore_last = False
 
     def __init__(self, drawing: Drawing, brush, color, brush_color=None):
-        print("init", self.__class__, drawing)
         self.drawing = drawing
         self.brush = brush
         self.color = color        # Color used for fills
