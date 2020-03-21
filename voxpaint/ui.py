@@ -391,7 +391,7 @@ def render_menu(window):
                 window.load_drawing()
 
             if imgui.begin_menu("Load recent...", window.recent_files):
-                for path in reversed(window.recent_files):
+                for path in reversed(list(window.recent_files)):
                     clicked, _ = imgui.menu_item(os.path.basename(path), None, False, True)
                     if clicked:
                         window.load_drawing(path)

@@ -125,9 +125,14 @@ class Selectable2:
             self._last.remove(key)
         except ValueError:
             pass
-        self._last.append(key)
-        self._current_key = key        
+        self._last.append(self._current_key)
+        self._current_key = key
 
+    def restore(self):
+        print(self._last)
+        if self._last:
+            self._current_key = self._last.pop(-1)
+            
     def __iter__(self):
         return iter(self._items.values())
     

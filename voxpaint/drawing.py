@@ -285,8 +285,12 @@ class DrawingView:
         self.move_cursor(*deltas)
         self.drawing.version += 1
 
-    def make_brush(self, rect=None):
-        data = self.layer().copy()
+    def make_brush(self, rect=None, clear=False):
+        if rect:
+            print(rect)
+            data = self.layer()[rect.as_slice()].copy()
+        else:
+            data = self.layer().copy()
         brush = ImageBrush(data=data)
         self.brushes.append(brush)
 

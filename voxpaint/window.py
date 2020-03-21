@@ -75,7 +75,13 @@ class VoxpaintWindow(pyglet.window.Window):
         self.push_handlers(self.keys)
 
         self.border_vao = VertexArrayObject(vertices_class=SimpleVertices)
-        self.border_vertices = self.border_vao.create_vertices(
+        self._border_vertices = self.border_vao.create_vertices(
+            [((0, 0, 0),),
+             ((0, 0, 0),),
+             ((0, 0, 0),),
+             ((0, 0, 0),)])
+        self.tool_rect_vao = VertexArrayObject(vertices_class=SimpleVertices)        
+        self._tool_rect_vertices = self.tool_rect_vao.create_vertices(
             [((0, 0, 0),),
              ((0, 0, 0),),
              ((0, 0, 0),),
@@ -88,13 +94,14 @@ class VoxpaintWindow(pyglet.window.Window):
                     LineTool, RectangleTool,
                     # EllipseTool,
                     FillTool,
-                    # SelectionTool,
+                    SelectionTool,
             ]
         })
         self.temp_tool = None
         
         self._brush = Brush((1, 1))
         self.stroke = None
+        self.stroke_tool = None
 
         self.mouse_position = None
 
@@ -176,6 +183,29 @@ class VoxpaintWindow(pyglet.window.Window):
             self.stroke.add_done_callback(lambda s: self.executor.submit(self._finish_stroke, s))
             self.stroke_tool = tool
 
+    # @cache_clear(get_layer_preview_texture)
+    @try_except_log
+    def _finish_stroke(self, stroke):
+        "Callback that gets run every time a stroke is finished."
+        # Since this is a callback, stroke is a Future and is guaranteed to be finished.
+        self.stroke_tool = None
+        tool = stroke.result()
+        if tool and tool.rect:
+            s = tool.rect.as_slice()
+            self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
+            self.view.overlay.clear(tool.rect)
+            self.view.dirty[self.view.layer_index] = tool.rect
+        else:
+            # If no rect is set, the tool is presumed to not have changed anything.
+            self.view.overlay.clear_all()
+        self.mouse_event_queue = None
+        self.stroke = None
+        if tool.restore_last:
+            print("restoring")
+            self.tools.restore()
+        # self.autosave_drawing()
+        print("Stroke finished")
+            
     def on_mouse_release(self, x, y, button, modifiers):
         if self.mouse_event_queue:
             x, y = self._to_image_coords(x, y)
@@ -229,8 +259,6 @@ class VoxpaintWindow(pyglet.window.Window):
             
     def on_key_press(self, symbol, modifiers):
 
-        print("press", symbol, modifiers)
-
         if symbol in {key.LEFT, key.A}:
             self.view.rotate(dz=-1)
         elif symbol in {key.RIGHT, key.D}:
@@ -247,21 +275,6 @@ class VoxpaintWindow(pyglet.window.Window):
             else:
                 self.view.rotate(dx=1)
         
-        # elif symbol == key.W:
-        #     if modifiers & key.MOD_SHIFT:
-        #         self.view.move_layer(1)
-        #     else:
-        #         self.view.next_layer()
-        #         self.view.layer_being_switched = True
-        # elif symbol == key.S:
-        #     if modifiers & key.MOD_SHIFT:
-        #         self.view.move_layer(-1)
-        #     elif modifiers & key.MOD_CTRL:
-        #         self.drawing.to_ora("/tmp/hej.ora")
-        #     else:
-        #         self.view.prev_layer()
-        #         self.view.layer_being_switched = True
-        
         elif symbol == key.O:
             self.view.show_only_current_layer = not self.view.show_only_current_layer
         
@@ -271,18 +284,12 @@ class VoxpaintWindow(pyglet.window.Window):
             self.tools.select(ToolName.line)
         elif symbol == key.F:
             self.tools.select(ToolName.floodfill)
+            self.overlay and self.overlay.clear_all()
         elif symbol == key.R:
             self.tools.select(ToolName.rectangle)
-        elif symbol == key.I:
-            self.tools.select(ToolName.picker)
-
         elif symbol == key.B:
-            if modifiers & key.MOD_SHIFT:
-                self.view.brushes.clear()
-                self.view.overlay.clear_all()
-            else:
-                self.view.make_brush()
-                self.view.overlay.clear_all()
+            self.tools.select(ToolName.brush)
+            self.overlay and self.overlay.clear_all()
             
         elif symbol == key.Z:
             self.view.undo()
@@ -301,8 +308,6 @@ class VoxpaintWindow(pyglet.window.Window):
 
     def on_key_release(self, symbol, modifiers):
 
-        print("release", symbol, modifiers)        
-        
         if symbol in {key.S, key.W}:
             if self.view:
                 self.view.layer_being_switched = False
@@ -315,26 +320,6 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_draw(self):
         self._render_view()
         self._render_gui()
-
-    # @cache_clear(get_layer_preview_texture)
-    @try_except_log
-    def _finish_stroke(self, stroke):
-        "Callback that gets run every time a stroke is finished."
-        # Since this is a callback, stroke is a Future and is guaranteed to be finished.
-        # self.stroke_tool = None
-        tool = stroke.result()
-        if tool and tool.rect:
-            s = tool.rect.as_slice()
-            self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
-            self.view.overlay.clear(tool.rect)
-            self.view.dirty[self.view.layer_index] = tool.rect
-        else:
-            # If no rect is set, the tool is presumed to not have changed anything.
-            self.view.overlay.clear_all()
-        self.mouse_event_queue = None
-        self.stroke = None
-        # self.autosave_drawing()
-        print("Stroke finished")
         
     def _render_view(self):
 
@@ -350,11 +335,12 @@ class VoxpaintWindow(pyglet.window.Window):
         ob = render_view(self)
         
         vm = self._make_view_matrix(window_size, size, self.zoom, self.offset)
+        vm = (gl.GLfloat*16)(*vm)
         gl.glViewport(0, 0, *window_size)
 
         self._update_border(self.view.shape)
         with self.border_vao, line_program:
-            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, (gl.GLfloat*16)(*vm))
+            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
             r, g, b, _ = (0.5, 0.5, 0.5, 0)  # TODO Use transparent color from palette?
             gl.glUniform3f(1, r, g, b)
             gl.glDrawArrays(gl.GL_TRIANGLE_FAN, 0, 4)
@@ -370,6 +356,16 @@ class VoxpaintWindow(pyglet.window.Window):
             gl.glUniform3f(1, 0., 0., 0.)
             gl.glLineWidth(1)
             gl.glDrawArrays(gl.GL_LINE_LOOP, 0, 4)
+
+        if self.stroke_tool and self.stroke_tool.show_rect:
+            if self.stroke_tool.rect:
+                self._update_tool_rect(self.stroke_tool.rect)
+                print(self.stroke_tool.rect)
+                with self.tool_rect_vao, line_program:
+                    gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
+                    gl.glUniform3f(1, 1., 1., 0.)
+                    gl.glLineWidth(1)
+                    gl.glDrawArrays(gl.GL_LINE_LOOP, 0, 4)            
 
     def _render_gui(self):
         w, h = self.get_size()
@@ -487,6 +483,7 @@ class VoxpaintWindow(pyglet.window.Window):
 
     def _add_recent_file(self, filename, maxsize=10):
         print("add recent file", filename)
+        self.recent_files.pop(filename, None)
         self.recent_files[filename] = None
         if len(self.recent_files) > maxsize:
             for f in self.recent_files:
@@ -565,13 +562,32 @@ class VoxpaintWindow(pyglet.window.Window):
         yw0 = (h2 - y0) / h
         xw1 = (x1 - w2) / w
         yw1 = (h2 - y1) / h
-        self.border_vertices.vertex_buffer.write([
+        self._border_vertices.vertex_buffer.write([
             ((xw0, yw0, 0),),
             ((xw1, yw0, 0),),
             ((xw1, yw1, 0),),
             ((xw0, yw1, 0),)
         ])
 
+    @lru_cache(1)
+    def _update_tool_rect(self, rect):
+        w, h = self.view.size
+        rw, rh = rect.size
+        x0, y0 = rect.position
+        x1, y1 = x0 + rw, y0 + rh
+        w2 = w / 2
+        h2 = h / 2
+        xw0 = (x0 - w2) / w
+        yw0 = (h2 - y0) / h
+        xw1 = (x1 - w2) / w
+        yw1 = (h2 - y1) / h
+        self._tool_rect_vertices.vertex_buffer.write([
+            ((xw0, yw0, 0),),
+            ((xw1, yw0, 0),),
+            ((xw1, yw1, 0),),
+            ((xw0, yw1, 0),)
+        ])
+        
         
 class OldpaintEventLoop(pyglet.app.EventLoop):
 
