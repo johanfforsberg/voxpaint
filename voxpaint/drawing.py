@@ -76,15 +76,18 @@ class Drawing:
         layers = list(view.layers)
         save_ora(self.size, layers, self.palette, path)
 
-    def save(self, path=None):
-        self.path = path if path is not None else self.path
-        assert self.path, "Can't save drawing; no path set."
-        _, ext = os.path.splitext(self.path)
+    def save(self, path=None, auto=False):
+        "Save the drawing to a file, in the appropriate format inferred from the filename."
+        path = path or self.path
+        assert path, "Can't save drawing; no path given."
+        _, ext = os.path.splitext(path)
         if ext == ".ora":
-            self.to_ora(self.path)
+            self.to_ora(path)
         else:
             raise ValueError(f"Can't save drawing; unknown format: {ext}")
-        self.last_saved_version = self.version
+        if not auto:
+            self.last_saved_version = self.version
+            self.path = path
 
     @property
     def unsaved(self):

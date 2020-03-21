@@ -57,10 +57,10 @@ def load_ora(path):
             with orafile.open(path) as imgf:
                 reader = png.Reader(imgf)
                 w, h, image_data, info = reader.read(imgf)
-                image_2d = np.vstack(map(np.uint8, image_data)).T
+                image_2d = np.vstack(list(map(np.uint8, image_data))).T
                 layers.append(image_2d)
         try:
             other_data = json.loads(orafile.read("oldpaint.json"))
         except KeyError:
             other_data = {}
-    return np.dstack(reversed(layers)), info, other_data
+    return np.dstack(list(reversed(layers))), info, other_data

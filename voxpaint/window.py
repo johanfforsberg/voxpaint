@@ -18,6 +18,7 @@ from fogl.vao import VertexArrayObject
 from fogl.vertex import SimpleVertices
 
 from .brush import Brush
+from .config import get_autosave_filename
 from .constants import ToolName
 from .drawing import Drawing, DrawingView
 from .imgui_pyglet import PygletRenderer
@@ -180,7 +181,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 color = self.drawing.palette.background
                 
             tool = self.tool(self.drawing, self.brush, color)
-            # self.autosave_drawing.cancel()
+            self.autosave_drawing.cancel()
             self.stroke = self.executor.submit(make_stroke, self.view, self.mouse_event_queue, tool)
             self.stroke.add_done_callback(lambda s: self.executor.submit(self._finish_stroke, s))
             self.stroke_tool = tool
@@ -204,7 +205,7 @@ class VoxpaintWindow(pyglet.window.Window):
         self.stroke = None
         if tool.restore_last:
             self.tools.restore()
-        # self.autosave_drawing()
+        self.autosave_drawing()
             
     def on_mouse_release(self, x, y, button, modifiers):
         if self.mouse_event_queue:
@@ -455,6 +456,19 @@ class VoxpaintWindow(pyglet.window.Window):
             fut.add_done_callback(
                 lambda fut: really_save_drawing(drawing, fut.result()))
 
+    @debounce(cooldown=60, wait=3)
+    def autosave_drawing(self):
+
+        @try_except_log
+        def really_autosave():
+            path = self.drawing.path or self.drawing.uuid
+            auto_filename = get_autosave_filename(path)
+            print(f"Autosaving to {auto_filename}...")
+            self.drawing.save(str(auto_filename), auto=True)
+
+        fut = self.executor.submit(really_autosave)
+        fut.add_done_callback(lambda fut: print("Autosave done!"))
+            
     def load_drawing(self, path=None):
 
         def really_load_drawing(path):
