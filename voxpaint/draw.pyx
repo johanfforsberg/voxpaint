@@ -1,10 +1,11 @@
+"""
+Implementations of primitive drawing operations on numpy arrays.
+"""
+
 cimport cython
 
-# from libc.math cimport abs
-# from libcpp.complex cimport abs
 from libc.stdlib cimport abs as iabs
 
-# from .picture cimport LongPicture
 from .rect cimport Rectangle
 
 
@@ -92,7 +93,7 @@ cdef void cblit(unsigned int[:, :] pic, unsigned int[:, :] brush, int x, int y) 
 cpdef draw_line(unsigned int [:, :] pic, unsigned int [:, :] brush,
                 (int, int) p0, (int, int) p1, int step=1):
 
-    "Draw a line from p0 to p1 using a brush or a single pixel of given color."
+    "Draw a straight line from p0 to p1 using a brush or a single pixel of given color."
 
     cdef int x, y, w, h, x0, y0, x1, y1, dx, sx, dy, sy, err, bw, bh
     x, y = p0
@@ -136,6 +137,8 @@ cpdef draw_line(unsigned int [:, :] pic, unsigned int [:, :] brush,
     return Rectangle((x00, y00), (x11 - x00, y11 - y00))
 
 
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.        
 cpdef draw_rectangle(unsigned int [:, :] pic, unsigned int [:, :] brush,
                      (int, int) pos, (int, int) size,
                      unsigned int color, bint fill=False):
@@ -167,165 +170,8 @@ cpdef draw_rectangle(unsigned int [:, :] pic, unsigned int [:, :] brush,
     return pic_rect.intersect(Rectangle((x, y), (min(cols, w + bw), min(rows, h + bh))))
 
 
-# cpdef draw_ellipse(LongPicture pic, (int, int) center, (int, int) size, LongPicture brush=None,
-#                    unsigned int color=0, bint fill=False):
-
-#     # TODO this does not handle small radii (<5) well
-#     # TODO support rotated ellipses
-
-#     cdef int w, h, a, b, x0, y0, a2, b2, error, x, y, stopx, stopy, bw, bh, hw, hh
-
-#     a, b = size
-#     if a <= 0 or b <= 0:
-#         return None
-#     x0, y0 = center
-
-#     a2 = 2*a*a
-#     b2 = 2*b*b
-#     error = a*a*b
-
-#     x = 0
-#     y = b
-#     stopy = 0
-#     stopx = a2 * b
-#     bw = brush.width if brush else 0
-#     bh = brush.height if brush else 0
-
-#     w, h = pic.size
-
-#     if not (0 <= x0 < w) or not (0 <= y0 < h):
-#         # TODO This should be allowed, but right now would crash
-#         return None
-
-#     cdef int xx, yy
-#     cdef int topy, boty, lx, rx
-
-#     if b == 0:
-#         if fill:
-#             lx = min(w-1, max(0, x0 - a))
-#             rx = max(0, min(w, x0 + a + 1))
-#             draw_line(pic, (lx, y0), (rx, y0), color)
-#             rect = Rectangle((x0-a, y0), (2*a+1, 1))
-#         else:
-#             rect = draw_line(pic, (x0-a, y0), (x0+a+1, y0), brush, color)
-#         return pic.rect.intersect(rect)
-
-#     if a == 0:
-#         if fill and color:
-#             rect = draw_rectangle(pic, (x0, y0-b), (1, 2*b+1), color=color, fill=True)
-#         else:
-#             rect = draw_line(pic, (x0, y0-b), (x0, y0+b+1), brush, color)
-#         return pic.rect.intersect(rect)
-
-#     # TODO Simplify.
-#     if fill:
-#         while stopy <= stopx:
-#             topy = y0 - y
-#             boty = y0 + y
-#             lx = min(w-1, max(0, x0 - x))
-#             rx = max(0, min(w, x0 + x))
-#             if topy >= 0:
-#                 draw_line(pic, (lx, topy), (rx, topy), None, color)
-#             if boty < h:
-#                 draw_line(pic, (lx, boty), (rx, boty), None, color)
-#             x += 1
-#             error -= b2 * (x - 1)
-#             stopy += b2
-#             if error <= 0:
-#                 error += a2 * (y - 1)
-#                 y -= 1
-#                 stopx -= a2
-
-#         error = b*b*a
-#         x = a
-#         y = 0
-#         stopy = b2 * a
-#         stopx = 0
-
-#         while stopy >= stopx:
-#             topy = y0 - y
-#             boty = y0 + y
-#             lx = max(0, x0 - x)
-#             rx = min(w, x0 + x)
-#             if topy >= 0:
-#                 draw_line(pic, (lx, topy), (rx, topy), None, color)
-#             if boty < h:
-#                 draw_line(pic, (lx, boty), (rx, boty), None, color)
-#             y += 1
-#             error -= a2 * (y - 1)
-#             stopx += a2
-#             if error < 0:
-#                 error += b2 * (x - 1)
-#                 x -= 1
-#                 stopy -= b2
-#     else:
-#         with nogil:
-#             # Note: nogil makes a huge differece here since this can be quite slow with
-#             # a large brush.
-#             while stopy <= stopx:
-#                 topy = y0 - y
-#                 boty = y0 + y
-#                 xx = x0 + x
-#                 yy = y0 + y
-#                 if (xx + bw) >= 0 and xx < w and (yy + bh) >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 xx = x0 - x
-#                 yy = y0 + y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 xx = x0 - x
-#                 yy = y0 - y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 xx = x0 + x
-#                 yy = y0 - y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 x += 1
-#                 error -= b2 * (x - 1)
-#                 stopy += b2
-#                 if error <= 0:
-#                     error += a2 * (y - 1)
-#                     y -= 1
-#                     stopx -= a2
-
-#             error = b*b*a
-#             x = a
-#             y = 0
-#             stopy = b2 * a
-#             stopx = 0
-
-#             while stopy >= stopx:
-#                 topy = y0 - y
-#                 boty = y0 + y
-#                 xx = x0 + x
-#                 yy = y0 + y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 xx = x0 - x
-#                 yy = y0 + y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 xx = x0 - x
-#                 yy = y0 - y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-#                 xx = x0 + x
-#                 yy = y0 - y
-#                 if xx + bw >= 0 and xx < w and yy + bh >= 0 and yy < h:
-#                     pic.paste(brush, xx, yy, True)
-
-#                 y += 1
-#                 error -= a2 * (y - 1)
-#                 stopx += a2
-#                 if error < 0:
-#                     error += b2 * (x - 1)
-#                     x -= 1
-#                     stopy -= b2
-
-#     return pic.rect.intersect(Rectangle((x0-a-1, y0-b-1), (2*a+bw+2, 2*b+bh+2)))
-
-
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.        
 cpdef draw_fill(unsigned int [:, :] pic, (int, int) point, unsigned int color):
 
     # TODO kind of slow, and requires the GIL.
