@@ -509,3 +509,34 @@ def render_errors(window):
                 imgui.close_current_popup()
             imgui.end_popup()
     
+
+def render_unsaved_exit(window):
+    if window.unsaved_drawings:
+        imgui.open_popup("Really exit?")
+
+    imgui.set_next_window_size(500, 200)
+    if imgui.begin_popup_modal("Really exit?")[0]:
+        imgui.text("You have unsaved work in these drawing(s):")
+
+        imgui.begin_child("unsaved", border=True,
+                          height=imgui.get_content_region_available()[1] - 26)
+        for drawing in window.unsaved_drawings:
+            imgui.text(drawing.filename)
+            if imgui.is_item_hovered():
+                pass  # TODO popup thumbnail of the picture?
+        imgui.end_child()
+
+        if imgui.button("Yes, exit anyway"):
+            imgui.close_current_popup()
+            pyglet.app.exit()
+        imgui.same_line()
+        if imgui.button("Yes, but save first"):
+            for drawing in window.unsaved_drawings:
+                window.save_drawing(drawing)
+            pyglet.app.exit()
+        imgui.same_line()
+        if imgui.button("No, cancel"):
+            window.unsaved_drawings = None
+            imgui.close_current_popup()
+        imgui.end_popup()
+            

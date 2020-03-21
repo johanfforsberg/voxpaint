@@ -67,6 +67,7 @@ class VoxpaintWindow(pyglet.window.Window):
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
             self.drawings = Selectable()
+        self.unsaved_drawings = None
         self._views = {}
         
         self.offset = (0, 0)
@@ -130,7 +131,7 @@ class VoxpaintWindow(pyglet.window.Window):
     @property
     def drawing(self):
         return self.drawings.current
-    
+        
     @property
     def view(self):
         if not self.drawing:
@@ -324,6 +325,9 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_draw(self):
         self._render_view()
         self._render_gui()
+
+    def on_close(self):
+        self._quit()
         
     def _render_view(self):
 
@@ -396,6 +400,8 @@ class VoxpaintWindow(pyglet.window.Window):
                 ui.render_layers(self.view)
 
                 imgui.end()
+
+                ui.render_unsaved_exit(self)
                 
                 render_plugins_ui(self.drawing)
                 
@@ -405,6 +411,14 @@ class VoxpaintWindow(pyglet.window.Window):
         imgui.end_frame()
         data = imgui.get_draw_data()
         self.imgui_renderer.render(data)
+
+    def _quit(self):
+        unsaved = [d for d in self.drawings if d.unsaved]
+        print([(d.version, d.last_saved_version) for d in unsaved])
+        if unsaved:
+            self.unsaved_drawings = unsaved
+        else:
+            pyglet.app.exit()
         
     @try_except_log
     def save_drawing(self, drawing=None, ask_for_path=False, auto=False):

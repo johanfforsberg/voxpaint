@@ -44,7 +44,7 @@ class Drawing:
         self.plugins = {}
         self.brushes = Selectable()
 
-        self.version = 0
+        self.last_saved_version = self.version = 0
 
     @property
     def size(self):
@@ -70,7 +70,7 @@ class Drawing:
     def from_ora(cls, path):
         data, info, _ = load_ora(path)
         return cls(data=data, palette=Palette(info["palette"]), path=path)
-
+    
     def to_ora(self, path):
         view = self.get_view()
         layers = list(view.layers)
@@ -84,6 +84,11 @@ class Drawing:
             self.to_ora(self.path)
         else:
             raise ValueError(f"Can't save drawing; unknown format: {ext}")
+        self.last_saved_version = self.version
+
+    @property
+    def unsaved(self):
+        return self.last_saved_version < self.version
 
     @property
     def layers(self):
