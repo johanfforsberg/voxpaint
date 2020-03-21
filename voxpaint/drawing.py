@@ -16,7 +16,7 @@ from .rect import Rectangle
 from .util import AutoResetting
 
 
-Shape = Tuple[int, ...]
+Shape = Tuple[int, int, int]
         
 
 class Drawing:
@@ -293,7 +293,7 @@ class DrawingView:
             data = self.layer().copy()
         brush = ImageBrush(data=data)
         self.brushes.append(brush)
-
+        
         
 class Overlay:
 
