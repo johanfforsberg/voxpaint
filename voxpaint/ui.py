@@ -194,7 +194,7 @@ def render_palette(drawing: Drawing):
         selection = is_foreground | is_background
         color = as_float(color)
 
-        if selection:
+        if color[3] == 0 or selection:
             x, y = imgui.get_cursor_screen_pos()
         
         if imgui.color_button(f"color {i}", *color[:3], 1, 0, 25, 25):
@@ -213,24 +213,23 @@ def render_palette(drawing: Drawing):
         draw_list = imgui.get_window_draw_list()            
         if color[3] == 0:
             # Mark transparent color
-            # draw_list.add_rect_filled(x+10, y+10, x+20, y+20, imgui.get_color_u32_rgba(0, 0, 0, 1))
-            # draw_list.add_rect(x+10, y+10, x+20, y+20,  )
             draw_list.add_line(x+1, y+1, x+24, y+24, imgui.get_color_u32_rgba(0, 0, 0, 1), 1)
             draw_list.add_line(x+1, y+2, x+23, y+24, imgui.get_color_u32_rgba(1, 1, 1, 1), 1)
             
         if is_foreground:
             # Mark foregroupd color
-            draw_list.add_rect_filled(x+2, y+2, x+10, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
-            draw_list.add_rect(x+2, y+2, x+10, y+10, imgui.get_color_u32_rgba(1, 1, 1, 1))
+            draw_list.add_rect_filled(x+2, y+2, x+10, y+10, imgui.get_color_u32_rgba(1, 1, 1, 1))
+            draw_list.add_rect(x+2, y+2, x+10, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
         if is_background:
             # Mark background color
-            draw_list.add_rect_filled(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(1, 1, 1, 1))
-            draw_list.add_rect(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
+            draw_list.add_rect_filled(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
+            draw_list.add_rect(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(1, 1, 1, 1))
 
         if imgui.core.is_item_clicked(2):
-            # Detect right button clicks on the button
+            # Right button sets background
             bg = i
 
+        # Drag and drop (currently does not accomplish anything though)
         if imgui.begin_drag_drop_source():
             imgui.set_drag_drop_payload('start_index', i.to_bytes(1, sys.byteorder))
             imgui.color_button(f"color {i}", *color[:3], 1, 0, 20, 20)
@@ -245,7 +244,7 @@ def render_palette(drawing: Drawing):
                 palette.clear_overlay()
             imgui.end_drag_drop_target()
 
-    imgui.pop_style_color(1)            
+    imgui.pop_style_color(1)
     imgui.pop_style_var(1)
     imgui.end_child()
     
