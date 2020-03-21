@@ -21,10 +21,9 @@ class DrawingView:
     layer_being_switched = AutoResetting(False)
     
     def __init__(self, drawing, rotation=(0, 0, 0)):
-        self.drawing = drawing
-        self.rotation = rotation
-        self.cursor = (0, 0, 0)
-        self.brushes = []
+        self.drawing = drawing  # The underlying data
+        self.rotation = rotation  # The transform
+        self.cursor = (0, 0, 0)  # Position of the "current" layer in each dimension
         
         self.show_only_current_layer = False
 
@@ -124,7 +123,11 @@ class DrawingView:
                     
     @property
     def overlay(self):
-        "The overlay is a temporary layer that is used for drawing."
+        """
+        The overlay is a temporary layer that is used for drawing in real time.
+        When an operation is done (e.g. a pencil stroke) the overlay is copied
+        into the drawing data (via an Edit, to make it undoable).
+        """
         return self._get_overlay(self.shape[:2])
 
     @lru_cache(3)
@@ -181,7 +184,7 @@ class DrawingView:
         else:
             data = self.layer().copy()
         brush = ImageBrush(data=data)
-        self.brushes.append(brush)
+        self.drawing.brushes.append(brush)
         
         
 class Overlay:

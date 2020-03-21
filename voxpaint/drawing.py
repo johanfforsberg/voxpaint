@@ -9,6 +9,7 @@ from .edit import LayerEdit, PaletteEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
+from .util import Selectable
 from .view import DrawingView
 
 
@@ -41,6 +42,7 @@ class Drawing:
         self.redos = []
 
         self.plugins = {}
+        self.brushes = Selectable()
 
         self.version = 0
 
@@ -60,6 +62,10 @@ class Drawing:
     def _get_rect(self, shape):
         return Rectangle((0, 0), shape[:2])
 
+    @property
+    def brush(self):
+        return self.brushes.current
+    
     @classmethod
     def from_ora(cls, path):
         data, info, _ = load_ora(path)
@@ -122,7 +128,7 @@ class Drawing:
 
     def get_view(self, rotation=(0, 0, 0)):
         return DrawingView(self, rotation)
-
+    
     def __hash__(self):
         return hash((id(self), self.data.shape))
 

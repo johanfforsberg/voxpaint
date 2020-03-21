@@ -154,7 +154,7 @@ class VoxpaintWindow(pyglet.window.Window):
     @property
     def brush(self):
         if self.drawing:
-            return self.view.brushes[-1] if self.view.brushes else self._brush
+            return self.drawing.brush or self._brush
     
     @no_imgui_events
     def on_mouse_press(self, x, y, button, modifiers):
@@ -305,6 +305,11 @@ class VoxpaintWindow(pyglet.window.Window):
         elif symbol == key.F4:
             init_plugins(self)
 
+        elif symbol == key.ESCAPE:
+            if self.drawing:
+                self.drawing.brushes.select(None)
+                self.overlay.clear_all()
+
     def on_key_release(self, symbol, modifiers):
 
         if symbol in {key.S, key.W}:
@@ -330,7 +335,7 @@ class VoxpaintWindow(pyglet.window.Window):
         w, h, d = self.view.shape
         size = w, h
         window_size = self.get_size()
-        
+
         ob = render_view(self)
         
         vm = self._make_view_matrix(window_size, size, self.zoom, self.offset)
@@ -340,8 +345,8 @@ class VoxpaintWindow(pyglet.window.Window):
         self._update_border(self.view.shape)
         with self.border_vao, line_program:
             gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
-            r, g, b, _ = (0.5, 0.5, 0.5, 0)  # TODO Use transparent color from palette?
-            gl.glUniform3f(1, r, g, b)
+            r, g, b, a = self.drawing.palette.background_color
+            gl.glUniform3f(1, r/256, g/256, b/256)
             gl.glDrawArrays(gl.GL_TRIANGLE_FAN, 0, 4)
 
         with self.vao, copy_program:

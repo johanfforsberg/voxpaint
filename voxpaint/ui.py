@@ -381,7 +381,7 @@ def render_menu(window):
         
         if imgui.begin_menu("File"):
 
-            clicked_load, selected_load = imgui.menu_item("Load", "o", False, True)
+            clicked_load, selected_load = imgui.menu_item("Load", "", False, True)
             if clicked_load:
                 window.load_drawing()
 
@@ -394,7 +394,7 @@ def render_menu(window):
 
             imgui.separator()
             
-            clicked_save, selected_save = imgui.menu_item("Save", "Ctrl+s", False, window.drawing)
+            clicked_save, selected_save = imgui.menu_item("Save", "", False, window.drawing)
             if clicked_save:
                 window.save_drawing()
 
@@ -417,13 +417,28 @@ def render_menu(window):
                 if clicked:
                     window.drawings.select(drawing)
             imgui.end_menu()
-        
+
+        if imgui.begin_menu("View", window.view):
+            
+            clicked, active = imgui.menu_item("Only show current layer", "",
+                                              window.view.show_only_current_layer, True)
+            if clicked:
+                window.view.show_only_current_layer = active
+            imgui.end_menu()
+            
         if imgui.begin_menu("Layer", window.drawing):
             ...
             imgui.end_menu()
 
         if imgui.begin_menu("Brush", window.drawing):
-            ...
+            drawing = window.drawing
+            for brush in drawing.brushes[-10:]:
+                clicked, active = imgui.menu_item(f"{brush.size}", "", brush == drawing.brush, True)
+                if clicked:
+                    if brush == drawing.brush:
+                        drawing.brushes.select(None)
+                    else:
+                        drawing.brushes.select(brush)
             imgui.end_menu()
 
         if imgui.begin_menu("Plugins", window.drawing):
