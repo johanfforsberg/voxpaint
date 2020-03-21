@@ -191,6 +191,26 @@ def debounce(cooldown=60, wait=3):
     return wrap
 
 
+class AutoResetting:
+
+    "A descriptor that automatically restores its default value some time after being set."
+
+    def __init__(self, default, reset_time=1):
+        self.value = self.default = default
+        self.reset_time = 0.5
+
+    def __get__(self, obj, type=None):
+        return self.value
+
+    def __set__(self, obj, value):
+        self.value = value
+        pyglet.clock.unschedule(self._reset)
+        pyglet.clock.schedule_once(self._reset, self.reset_time)
+        
+    def _reset(self, dt):
+        self.value = self.default
+    
+
 def cache_clear(cached_func):
     """Decorator that calls cache_clear on the given lru_cached function after
     the decorated function gets called."""

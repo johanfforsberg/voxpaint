@@ -4,8 +4,8 @@ import math
 import os
 from threading import RLock
 
+from euclid3 import Vector3
 import numpy as np
-from euclid3 import Vector3, Matrix4
 
 from .brush import ImageBrush
 from .draw import blit, draw_line, draw_rectangle
@@ -13,6 +13,7 @@ from .edit import LayerEdit, PaletteEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
+from .util import AutoResetting
 
 
 Shape = Tuple[int, ...]
@@ -124,10 +125,12 @@ class Drawing:
 
     def __hash__(self):
         return hash((id(self), self.data.shape))
-        
+
     
 class DrawingView:
 
+    layer_being_switched = AutoResetting(False)
+    
     def __init__(self, drawing, rotation=(0, 0, 0)):
         self.drawing = drawing
         self.rotation = rotation
@@ -135,7 +138,6 @@ class DrawingView:
         self.brushes = []
         
         self.show_only_current_layer = False
-        self.layer_being_switched = False
 
     def rotate(self, dx=0, dy=0, dz=0):
         pitch, yaw, roll = self.rotation

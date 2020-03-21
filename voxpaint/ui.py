@@ -360,7 +360,6 @@ def render_layers(view):
     layers = list(view.layers)
     n_layers = len(layers)
     index = view.layer_index
-    x, y, z = view.direction
     # imgui.text(f"{x}, {y}, {z}")
     min_value = 0
     max_value = n_layers - 1
@@ -373,12 +372,12 @@ def render_layers(view):
         changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
                                                 min_value=max_value,
                                                 max_value=min_value)
-        index = n_layers + index + 1
+        new_index = n_layers + new_index + 1
     if changed:
+        x, y, z = view.direction
         delta = new_index - index
         view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)
-
-    view.layer_being_switched = imgui.is_item_hovered()
+        view.layer_being_switched = True
         
 
 def render_menu(window):
