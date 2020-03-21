@@ -57,7 +57,7 @@ def render_tools(tools, icons):
             if imgui.image_button(texture.name, 16, 16):
                 tools.select(tool.tool)
                 selected = True
-            if i % 3 != 2:
+            if i % 3 != 2 and not i == len(tools) - 1:
                 imgui.same_line()
         if imgui.is_item_hovered():
             imgui.begin_tooltip()
@@ -177,20 +177,6 @@ def render_palette(drawing: Drawing):
 
     imgui.same_line()
 
-    # Edit background color
-    if imgui.color_button(f"Background (#{bg})", *as_float(bg_color), 0, 30, 30):
-        imgui.open_popup("Edit background color")
-    # if imgui.begin_popup("Edit background color"):
-    #     done, cancelled, new_color = render_color_editor(palette.colors[bg], bg_color)
-    #     if done:
-    #         drawing.change_colors(bg, [new_color])
-    #         palette.clear_overlay()
-    #     elif cancelled:
-    #         palette.clear_overlay()
-    #     else:
-    #         palette.set_overlay(bg, new_color)
-    #     imgui.end_popup()
-
     max_pages = len(palette.colors) // 64 - 1
     imgui.push_item_width(100)
     _, current_color_page = imgui.slider_int("Page", current_color_page, min_value=0, max_value=max_pages)
@@ -223,13 +209,23 @@ def render_palette(drawing: Drawing):
 
         if i % width != width - 1:
             imgui.same_line()
-        
+
+        draw_list = imgui.get_window_draw_list()            
+        if color[3] == 0:
+            # Mark transparent color
+            # draw_list.add_rect_filled(x+10, y+10, x+20, y+20, imgui.get_color_u32_rgba(0, 0, 0, 1))
+            # draw_list.add_rect(x+10, y+10, x+20, y+20,  )
+            draw_list.add_line(x+1, y+1, x+24, y+24, imgui.get_color_u32_rgba(0, 0, 0, 1), 1)
+            draw_list.add_line(x+1, y+2, x+23, y+24, imgui.get_color_u32_rgba(1, 1, 1, 1), 1)
+            
         if is_foreground:
-            draw_list = imgui.get_window_draw_list()
+            # Mark foregroupd color
             draw_list.add_rect_filled(x+2, y+2, x+10, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
+            draw_list.add_rect(x+2, y+2, x+10, y+10, imgui.get_color_u32_rgba(1, 1, 1, 1))
         if is_background:
-            draw_list = imgui.get_window_draw_list()
-            draw_list.add_rect_filled(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
+            # Mark background color
+            draw_list.add_rect_filled(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(1, 1, 1, 1))
+            draw_list.add_rect(x+15, y+2, x+23, y+10, imgui.get_color_u32_rgba(0, 0, 0, 1))
 
         if imgui.core.is_item_clicked(2):
             # Detect right button clicks on the button

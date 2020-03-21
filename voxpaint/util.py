@@ -135,6 +135,9 @@ class Selectable2:
             
     def __iter__(self):
         return iter(self._items.values())
+
+    def __len__(self):
+        return len(self._items)
     
 
 def throttle(interval=0.1):
