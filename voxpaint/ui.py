@@ -1,4 +1,5 @@
 from functools import lru_cache
+from inspect import isclass
 import logging
 from math import floor, ceil
 import os
@@ -437,7 +438,11 @@ def render_menu(window):
                 is_active = plugin in active_plugins
                 clicked, selected = imgui.menu_item(name, None, is_active, True)
                 if selected:
-                    window.drawing.plugins[name] = plugin
+                    (plugin, sig, args) = plugin
+                    if isclass(plugin):
+                        window.drawing.plugins[name] = plugin(), sig, args
+                    else:
+                        window.drawing.plugins[name] = plugin, sig, args
                 elif is_active:
                     del window.drawing.plugins[name]
             imgui.end_menu()

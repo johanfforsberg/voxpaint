@@ -398,13 +398,14 @@ class VoxpaintWindow(pyglet.window.Window):
 
                 imgui.end()
                 
-                render_plugins_ui(self)
+                render_plugins_ui(self.drawing)
                 
             ui.render_new_drawing_popup(self)
 
         imgui.render()
         imgui.end_frame()
-        self.imgui_renderer.render(imgui.get_draw_data())
+        data = imgui.get_draw_data()
+        self.imgui_renderer.render(data)
         
     @try_except_log
     def save_drawing(self, drawing=None, ask_for_path=False, auto=False):

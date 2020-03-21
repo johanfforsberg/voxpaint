@@ -40,23 +40,29 @@ def init_plugins(window):
                 params = dict(islice(sig.parameters.items(), 1, None))
                 # TODO Broken if plugin is active for more than one drawing!
                 # Need one instance per drawing.
-                window.plugins[plugin_name] = plugin.Plugin(), params, {}
+                window.plugins[plugin_name] = plugin.Plugin, params, {}
         except Exception:
             print_exc()
             
 
 @try_except_log
-def render_plugins_ui(window):
+def render_plugins_ui(drawing):
     "Draw UI windows for all plugins active for the current drawing."
-    if not window.drawing:
+
+    # TODO there's an imgui related crash here somewhere preventing (at least) the
+    # voxel plugin from being used in more than one drawing. For now: avoid that.
+    
+    if not drawing:
         return
     
     deactivated = set()
-    for name in window.drawing.plugins:
-        plugin, sig, args = window.plugins[name]
-        _, opened = imgui.begin(name, True)
+
+    for name, (plugin, sig, args) in drawing.plugins.items():
+        _, opened = imgui.begin(f"{name} {id(drawing)}", True)
         if not opened:
             deactivated.add(name)
+            imgui.end()
+            continue
         imgui.columns(2)
         for param_name, param_sig in islice(sig.items(), 2, None):
             imgui.text(param_name)
@@ -92,7 +98,7 @@ def render_plugins_ui(window):
         if period and t > last_run + period or imgui.button("Execute"):
             plugin.last_run = last_run
             try:
-                result = plugin(voxpaint, window.drawing, **args)
+                result = plugin(voxpaint, drawing, **args)
                 if result:
                     args.update(result)
             except Exception:
@@ -105,7 +111,7 @@ def render_plugins_ui(window):
             else:
                 imgui.text("No documentation available.")
             imgui.end_popup()
-
         imgui.end()
+        
     for name in deactivated:
-        window.drawing.active_plugins.pop(name, None)
+        drawing.plugins.pop(name, None)
