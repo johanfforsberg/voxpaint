@@ -129,7 +129,7 @@ class SprayTool(Tool):
         x, y = point
         xg = gauss(x, self.size)
         yg = gauss(y, self.size)
-        rect = view.overlay.blit(self.brush, (xg, yg), self.color)
+        rect = view.overlay.blit_brush(self.brush, (xg, yg), self.color)
         if rect:
             self.rect = rect.unite(self.rect)
 
