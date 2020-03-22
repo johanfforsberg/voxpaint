@@ -197,7 +197,7 @@ class VoxpaintWindow(pyglet.window.Window):
         tool = stroke.result()
         if tool and tool.rect:
             s = tool.rect.as_slice()
-            self.view.modify(self.view.layer_index, s, self.view.overlay.data[s], tool)
+            self.view.modify_layer(self.view.layer_index, s, self.view.overlay.data[s], tool)
             self.view.overlay.clear(tool.rect)
             self.view.dirty[self.view.layer_index] = tool.rect
         else:

@@ -106,15 +106,13 @@ class Drawing:
     def layers(self):
         return [self.data[:, :, i] for i in range(self.data.shape[2])]
         
-    def modify(self, index, slc, data, rotation, tool):
+    def modify(self, slc, data, rotation, tool):
         # TODO This seems a little over complicated; seems like it
         # should be possible to find the slice in the original data to
         # use.
-        view = DrawingView(self, rotation=rotation)
-        layer = view.layer(index)
-        edit = LayerEdit.create(index, slc, rotation, layer, data, tool)
+        edit = LayerEdit.create(self, slc, data, rotation, tool)
+        edit.perform(self)
         self.undos.append(edit)
-        np.copyto(layer[slc], data, where=data > 255)
         self.redos.clear()
         self.version += 1
 

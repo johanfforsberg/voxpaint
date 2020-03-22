@@ -10,42 +10,42 @@ class Edit:
 @dataclass(frozen=True)
 class LayerEdit(Edit):
     
-    index: int
     slc: tuple
-    rotation: tuple
     diff: bytes
+    rotation: tuple
     points: list
     color: int
 
     @classmethod
-    def create(cls, index, slc, rotation, layer, data, tool):
+    def create(cls, drawing, slc, data, rotation, tool):
         mask = data.astype(np.bool)
+        view = drawing.get_view(rotation)
+        # TODO seems like there should be a way to do this without having to
+        # re-create the view every time, but I haven't found it yet. In any case
+        # it's very cheap, but we need to store the rotation.
         return cls(
-            index,
             slc,
+            zlib.compress(np.subtract(data, mask * view.data[slc], dtype=np.int16).tobytes()),
             rotation,
-            zlib.compress(np.subtract(data, mask * layer[slc], dtype=np.int16).tobytes()),
             [],  # tool.points,
             tool.color
         )
 
     def perform(self, drawing):
-        slc = sx, sy = self.slc
-        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
+        slc = sx, sy, sz = self.slc
+        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start), abs(sz.stop - sz.start)]
         diff = np.frombuffer(zlib.decompress(self.diff),
                              dtype=np.int16).reshape(shape)
         view = drawing.get_view(rotation=self.rotation)
-        layer = view.layer(self.index)
-        layer[slc] = np.add(layer[slc], diff, casting="unsafe")
+        view.data[slc] = np.add(view.data[slc], diff, casting="unsafe")
 
     def revert(self, drawing):
-        slc = sx, sy = self.slc
-        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
+        slc = sx, sy, sz = self.slc
+        shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start), abs(sz.stop - sz.start)]
         diff = np.frombuffer(zlib.decompress(self.diff),
                              dtype=np.int16).reshape(shape)
         view = drawing.get_view(rotation=self.rotation)
-        layer = view.layer(self.index)
-        layer[slc] = np.subtract(layer[slc], diff, casting="unsafe")
+        view.data[slc] = np.subtract(view.data[slc], diff, casting="unsafe")
 
 
 @dataclass(frozen=True)

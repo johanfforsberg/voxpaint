@@ -1,6 +1,7 @@
 from functools import lru_cache
 import math
 from threading import RLock
+from typing import Tuple, Optional
 
 from euclid3 import Vector3
 import numpy as np
@@ -54,7 +55,7 @@ class DrawingView:
         return self._get_data(self.rotation)
 
     @lru_cache(1)
-    def _get_data(self, rotation):
+    def _get_data(self, rotation: Tuple[int, int, int]):
         " Return a ndarray view on the drawing data, rotated properly. "
         data = self.drawing.data
         rx, ry, rz = rotation
@@ -72,7 +73,7 @@ class DrawingView:
         return self._get_direction(self.rotation)
 
     @lru_cache(1)
-    def _get_direction(self, rotation):
+    def _get_direction(self, rotation: Tuple[int, int, int]):
         """
         Return a vector pointing in the positive direction of the current view.
         That means the direction in which the layer structure is stacked,
@@ -145,9 +146,12 @@ class DrawingView:
         rect = Rectangle(size=(w, h))
         return {index: rect for index in range(d)}
 
-    def modify(self, index, slc, data, tool):
-        self.drawing.modify(index, slc, data, self.rotation, tool)
+    def modify(self, slc3: Tuple[slice, slice, slice], data, tool):
+        self.drawing.modify(slc3, data, self.rotation, tool)
 
+    def modify_layer(self, index, slc2, data, tool):
+        self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
+        
     def undo(self):
         self.drawing.undo()
         self._get_dirty.cache_clear()
@@ -164,7 +168,7 @@ class DrawingView:
         x, y, z = self.direction
         self.move_cursor(-x, -y, -z)
 
-    def move_layer(self, d):
+    def move_layer(self, d: int):
         index = self.layer_index
         other_index = index + d
         if not 0 <= other_index < self.shape[2]:
@@ -177,7 +181,7 @@ class DrawingView:
         self.move_cursor(*deltas)
         self.drawing.version += 1
 
-    def make_brush(self, rect=None, clear=False):
+    def make_brush(self, rect: Optional[Rectangle]=None, clear: bool=False):
         if rect:
             print(rect)
             data = self.layer()[rect.as_slice()].copy()
@@ -191,7 +195,7 @@ class Overlay:
 
     "A temporary 'layer' used for realtime preview of changes."
     
-    def __init__(self, size):
+    def __init__(self, size: Tuple[int, int]):
         self.size = size
         self.data = np.zeros(size, dtype=np.uint32)
 
@@ -203,7 +207,7 @@ class Overlay:
     def clear_all(self):
         self.clear(self.rect)
         
-    def clear(self, rect):
+    def clear(self, rect: Rectangle):
         rect = self.rect.intersect(rect)
         if rect:
             x0, y0, x1, y1 = rect.box()
@@ -219,7 +223,7 @@ class Overlay:
         data = brush.get_draw_data(color)
         return self.blit(data, (int(x - dx), int(y - dy)))
 
-    def blit(self, data, p):
+    def blit(self, data: np.ndarray, p: Tuple[int, int]):
         x, y = p
         with self.lock:
             rect = blit(self.data, data, x, y)
@@ -249,3 +253,11 @@ class Overlay:
     # TODO to be implemented
     # def draw_ellipse(self, brush, pos, size, color=0, fill=False):
     #     pass
+
+    def shift(self, dx=0, dy=0, dz=0):
+        data = self.data.copy()
+        self.data = 0
+        x, y, z = self.shape
+        #self.data[max(0, dx):min(x, x+dx), max(0, dy):min(y, y+dy), max(0, dz):min(z, z+dz)] +=
+        
+        #self.modify(0, data[max(0, -dx):min(x, x-dx), max(0, -dy):max(y, y-dy), max(0, -dz):max(z, z-dz)]
