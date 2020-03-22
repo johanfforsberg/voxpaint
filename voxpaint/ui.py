@@ -354,22 +354,13 @@ def render_palette_popup(drawing: Drawing):
 
 def render_layers(view):
 
+    "Layer selector. Currently extremely spare."
+
     layers = list(view.layers)
     n_layers = len(layers)
     index = view.layer_index
-    # imgui.text(f"{x}, {y}, {z}")
-    min_value = 0
-    max_value = n_layers - 1
-    if sum(view.direction) > 0:
-        changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
-                                                min_value=min_value,
-                                                max_value=max_value)
-    else:
-        index = n_layers - index - 1
-        changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
-                                                min_value=max_value,
-                                                max_value=min_value)
-        new_index = n_layers + new_index + 1
+    changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
+                                            min_value=0, max_value=n_layers - 1)
     if changed:
         x, y, z = view.direction
         delta = new_index - index
@@ -378,6 +369,8 @@ def render_layers(view):
         
 
 def render_menu(window):
+
+    "Main menu bar."
 
     if imgui.begin_main_menu_bar():
         
@@ -408,16 +401,20 @@ def render_menu(window):
 
         if imgui.begin_menu("Drawing"):
 
-            clicked, _ = imgui.menu_item("New", "", False, True)
-            if clicked:
+            if imgui.menu_item("New", "", False, True)[0]:
                 window.create_drawing()
-            
-            imgui.separator()
-            
-            for drawing in window.drawings:
-                clicked, _ = imgui.menu_item(drawing.filename, "", False, True)
-                if clicked:
-                    window.drawings.select(drawing)
+
+            if imgui.menu_item("Close", "", False, window.drawing)[0]:
+                window.close_drawing()
+                
+            if window.drawings:
+                imgui.separator()
+
+                for drawing in window.drawings:
+                    selected = drawing == window.drawing
+                    clicked, _ = imgui.menu_item(drawing.filename, "", selected, True)
+                    if clicked:
+                        window.drawings.select(drawing)
             imgui.end_menu()
 
         if imgui.begin_menu("View", window.view):
@@ -426,6 +423,18 @@ def render_menu(window):
                                               window.view.show_only_current_layer, True)
             if clicked:
                 window.view.show_only_current_layer = active
+
+            imgui.separator()
+            
+            if imgui.menu_item("Rotate up", "w", False, True)[0]:
+                window.view.rotate(dx=-1)
+            if imgui.menu_item("Rotate down", "s", False, True)[0]:
+                window.view.rotate(dx=1)
+            if imgui.menu_item("Rotate left", "a", False, True)[0]:
+                window.view.rotate(dz=-1)
+            if imgui.menu_item("Rotate right", "d", False, True)[0]:
+                window.view.rotate(dz=1)
+                
             imgui.end_menu()
             
         if imgui.begin_menu("Layer", window.drawing):
@@ -477,6 +486,8 @@ def render_menu(window):
         
 def render_new_drawing_popup(window):
 
+    "Settings for creating a new drawing."
+
     if window._new_drawing:
         imgui.open_popup("New drawing")
         w, h = window.get_size()
@@ -512,8 +523,39 @@ def render_errors(window):
             imgui.end_popup()
     
 
+def render_unsaved_close_drawing(window):
+
+    "Popup to prevent accidentally closing a drawing with unsaved work."
+    
+    drawing = window.close_unsaved_drawing
+    
+    if drawing and drawing.unsaved:
+        imgui.open_popup("Really close?")
+
+    if imgui.begin_popup_modal("Really close?", flags=imgui.WINDOW_NO_RESIZE)[0]:
+        imgui.text("The drawing contains unsaved work.")
+        if imgui.button("Yes, close anyway"):
+            window.drawings.remove(drawing)
+            window.close_unsaved_drawing = None
+            imgui.close_current_popup()        
+        imgui.same_line()
+        if imgui.button("Yes, but save first"):
+            window.save_drawing(drawing)
+            window.drawings.remove(drawing)
+            window.close_unsaved_drawing = None
+            imgui.close_current_popup()
+        imgui.same_line()
+        if imgui.button("No, cancel"):
+            window.close_unsaved_drawing = None
+            imgui.close_current_popup()
+        imgui.end_popup()
+            
+
 def render_unsaved_exit(window):
-    if window.unsaved_drawings:
+
+    "Popup to prevent exiting the application with unsaved work."
+    
+    if window.exit_unsaved_drawings:
         imgui.open_popup("Really exit?")
 
     imgui.set_next_window_size(500, 200)
@@ -522,7 +564,7 @@ def render_unsaved_exit(window):
 
         imgui.begin_child("unsaved", border=True,
                           height=imgui.get_content_region_available()[1] - 26)
-        for drawing in window.unsaved_drawings:
+        for drawing in window.exit_unsaved_drawings:
             imgui.text(drawing.filename)
             if imgui.is_item_hovered():
                 pass  # TODO popup thumbnail of the picture?
@@ -533,12 +575,13 @@ def render_unsaved_exit(window):
             pyglet.app.exit()
         imgui.same_line()
         if imgui.button("Yes, but save first"):
-            for drawing in window.unsaved_drawings:
+            for drawing in window.exit_unsaved_drawings:
                 window.save_drawing(drawing)
             pyglet.app.exit()
         imgui.same_line()
         if imgui.button("No, cancel"):
-            window.unsaved_drawings = None
+            window.exit_unsaved_drawings = None
             imgui.close_current_popup()
         imgui.end_popup()
             
+        

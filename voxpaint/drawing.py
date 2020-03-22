@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Optional, Tuple, List
 import os
 from threading import RLock
+from uuid import uuid4
 
 import numpy as np
 
@@ -34,6 +35,7 @@ class Drawing:
             self.data = np.zeros(shape, dtype=np.uint8)
         self.palette = palette or Palette()
         self.path = path
+        self.uuid = str(uuid4())
         self.filename = os.path.basename(path) if path else "[Unnamed]"
 
         self.lock = RLock()

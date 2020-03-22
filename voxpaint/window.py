@@ -68,7 +68,8 @@ class VoxpaintWindow(pyglet.window.Window):
         else:
             # self.drawing = Drawing((640, 480, 10), palette=Palette())
             self.drawings = Selectable()
-        self.unsaved_drawings = None
+        self.exit_unsaved_drawings = None
+        self.close_unsaved_drawing = None
         self._views = {}
         
         self.offset = (0, 0)
@@ -408,6 +409,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 imgui.end()
 
                 ui.render_unsaved_exit(self)
+                ui.render_unsaved_close_drawing(self)
                 
                 render_plugins_ui(self.drawing)
                 
@@ -421,7 +423,7 @@ class VoxpaintWindow(pyglet.window.Window):
     def _quit(self):
         unsaved = [d for d in self.drawings if d.unsaved]
         if unsaved:
-            self.unsaved_drawings = unsaved
+            self.exit_unsaved_drawings = unsaved
         else:
             pyglet.app.exit()
         
@@ -509,7 +511,14 @@ class VoxpaintWindow(pyglet.window.Window):
     def really_create_drawing(self):
         drawing = Drawing(size=self._new_drawing["shape"])
         self.drawings.append(drawing)
-        self._new_drawing = None        
+        self._new_drawing = None
+
+    def close_drawing(self):
+        drawing = self.drawing
+        if drawing.unsaved:
+            self.close_unsaved_drawing = drawing
+        else:
+            self.drawings.remove(drawing)
             
     def _get_latest_dir(self):
         if self.recent_files:
