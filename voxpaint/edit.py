@@ -13,19 +13,18 @@ class LayerEdit(Edit):
     index: int
     slc: tuple
     rotation: tuple
-    orig_data: bytes
-    data: bytes
+    diff: bytes
     points: list
     color: int
 
     @classmethod
     def create(cls, index, slc, rotation, layer, data, tool):
+        mask = data.astype(np.bool)
         return cls(
             index,
             slc,
             rotation,
-            zlib.compress(layer[slc].tobytes()),
-            zlib.compress(data.tobytes()),
+            zlib.compress(np.subtract(data, mask * layer[slc], dtype=np.int16).tobytes()),
             [],  # tool.points,
             tool.color
         )
@@ -33,20 +32,20 @@ class LayerEdit(Edit):
     def perform(self, drawing):
         slc = sx, sy = self.slc
         shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
-        data = np.frombuffer(zlib.decompress(self.data),
-                             dtype=np.uint32).reshape(shape)
+        diff = np.frombuffer(zlib.decompress(self.diff),
+                             dtype=np.int16).reshape(shape)
         view = drawing.get_view(rotation=self.rotation)
         layer = view.layer(self.index)
-        np.copyto(layer[slc], data, where=data > 255)
+        layer[slc] = np.add(layer[slc], diff, casting="unsafe")
 
     def revert(self, drawing):
         slc = sx, sy = self.slc
         shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start)]
-        data = np.frombuffer(zlib.decompress(self.orig_data),
-                             dtype=np.uint8).reshape(shape)
+        diff = np.frombuffer(zlib.decompress(self.diff),
+                             dtype=np.int16).reshape(shape)
         view = drawing.get_view(rotation=self.rotation)
         layer = view.layer(self.index)
-        np.copyto(layer[slc], data)
+        layer[slc] = np.subtract(layer[slc], diff, casting="unsafe")
 
 
 @dataclass(frozen=True)
