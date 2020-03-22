@@ -36,7 +36,6 @@ class Drawing:
         self.palette = palette or Palette()
         self.path = path
         self.uuid = str(uuid4())
-        self.filename = os.path.basename(path) if path else "[Unnamed]"
 
         self.lock = RLock()
 
@@ -63,6 +62,14 @@ class Drawing:
     @lru_cache(1)
     def _get_rect(self, shape):
         return Rectangle((0, 0), shape[:2])
+
+    @property
+    def filename(self):
+        return self._get_filename(self.path)
+
+    @lru_cache(1)
+    def _get_filename(self, path):
+        return os.path.basename(path) if path else "[Unnamed]"
 
     @property
     def brush(self):

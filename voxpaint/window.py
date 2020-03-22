@@ -59,7 +59,7 @@ class VoxpaintWindow(pyglet.window.Window):
 
     def __init__(self, recent_files, *args, path=None, **kwargs):
         
-        super().__init__(*args, **kwargs, resizable=True, vsync=False)
+        super().__init__(*args, **kwargs, caption="Voxpaint", resizable=True, vsync=False)
 
         self.recent_files = OrderedDict((k, None) for k in recent_files)
         
