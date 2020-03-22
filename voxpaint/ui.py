@@ -177,6 +177,8 @@ def render_palette(drawing: Drawing):
 
     imgui.same_line()
 
+    imgui.color_button(f"Background (#{bg})", *as_float(bg_color), 0, 30, 30)
+    
     max_pages = len(palette.colors) // 64 - 1
     imgui.push_item_width(100)
     _, current_color_page = imgui.slider_int("Page", current_color_page, min_value=0, max_value=max_pages)
