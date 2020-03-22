@@ -6,13 +6,14 @@ from traceback import print_exc
 import os
 from queue import Queue
 
+from euclid3 import Matrix4
 import imgui
 import pyglet
 from pyglet import gl
 from pyglet.window import key
 
 from fogl.shader import Program, VertexShader, FragmentShader
-from fogl.texture import Texture, ByteTexture, ImageTexture
+from fogl.texture import ImageTexture
 from fogl.util import load_png
 from fogl.vao import VertexArrayObject
 from fogl.vertex import SimpleVertices
@@ -20,19 +21,18 @@ from fogl.vertex import SimpleVertices
 from .brush import Brush
 from .config import get_autosave_filename
 from .constants import ToolName
-from .drawing import Drawing, DrawingView
+from .drawing import Drawing
 from .imgui_pyglet import PygletRenderer
-from .palette import Palette
 from .plugin import init_plugins, render_plugins_ui
 from .rect import Rectangle
 from .render import render_view
 from .stroke import make_stroke
 from .tool import (PencilTool, PointsTool, SprayTool,
-                   LineTool, RectangleTool, EllipseTool,
+                   LineTool, RectangleTool,  # EllipseTool,
                    SelectionTool, ColorPickerTool, LayerPickerTool, FillTool)
 from . import ui
 from .util import (make_view_matrix, try_except_log, Selectable, Selectable2, no_imgui_events,
-                   show_load_dialog, show_save_dialog, cache_clear, debounce)
+                   show_load_dialog, show_save_dialog, debounce)
 
 
 vao = VertexArrayObject()
@@ -125,6 +125,7 @@ class VoxpaintWindow(pyglet.window.Window):
             for name in ["brush", "ellipse", "floodfill", "line", "spray",
                          "pencil", "picker", "points", "rectangle"]
         }
+        self.mouse_texture = ImageTexture(*load_png("icons/cursor.png"))
 
         self.plugins = {}
         init_plugins(self)
@@ -217,10 +218,9 @@ class VoxpaintWindow(pyglet.window.Window):
         "Callback for mouse motion without buttons held"
         if self.stroke or not self.view:
             return
-        # self._update_cursor(x, y)
+        self._update_cursor(x, y)
         if self.tool.brush_preview:
             self._draw_brush_preview(x - dx, y - dy, x, y)
-        self.mouse_position = x, y
 
     def on_mouse_leave(self, x, y):
         if not self.stroke and self.drawing:
@@ -230,6 +230,10 @@ class VoxpaintWindow(pyglet.window.Window):
     @no_imgui_events
     def on_mouse_drag(self, x, y, dx, dy, button, modifiers):
         "Callback for mouse movement with buttons held"
+        if (x, y) == self.mouse_position:
+            # The mouse hasn't actually moved; do nothing
+            return      
+        self._update_cursor(x, y)
         if self.stroke:
             # Add to ongoing stroke
             x, y = self._to_image_coords(x, y)
@@ -360,6 +364,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 gl.glEnable(gl.GL_BLEND)
                 gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, (gl.GLfloat*16)(*vm))
                 gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
+            self._draw_mouse_cursor()            
 
         with self.border_vao, line_program:                
             gl.glUniform3f(1, 0., 0., 0.)
@@ -415,7 +420,6 @@ class VoxpaintWindow(pyglet.window.Window):
 
     def _quit(self):
         unsaved = [d for d in self.drawings if d.unsaved]
-        print([(d.version, d.last_saved_version) for d in unsaved])
         if unsaved:
             self.unsaved_drawings = unsaved
         else:
@@ -513,7 +517,6 @@ class VoxpaintWindow(pyglet.window.Window):
             return os.path.dirname(f)
 
     def _add_recent_file(self, filename, maxsize=10):
-        print("add recent file", filename)
         self.recent_files.pop(filename, None)
         self.recent_files[filename] = None
         if len(self.recent_files) > maxsize:
@@ -552,7 +555,49 @@ class VoxpaintWindow(pyglet.window.Window):
             ix, iy = self._to_image_coords(x, y)
             w, h = self.view.size
             return 0 <= ix < w and 0 <= iy < h
-    
+
+    def _draw_mouse_cursor(self):
+        """ If the mouse is over the image, draw a cursom crosshair. """
+        if self.mouse_position is None:
+            return
+        x, y = self.mouse_position
+        w, h = self.get_size()
+        vm = self._make_cursor_view_matrix(x, y)
+        with self.mouse_texture:
+            gl.glBlendFunc(gl.GL_ONE, gl.GL_ONE_MINUS_SRC_ALPHA)
+            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, (gl.GLfloat*16)(*vm))
+            gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
+            gl.glBlendFunc(gl.GL_ONE, gl.GL_ZERO)
+
+    @lru_cache(1)
+    def _make_cursor_view_matrix(self, x, y):
+
+        "Calculate a view matrix for placing the custom cursor on screen."
+
+        ww, wh = self.get_size()
+        iw, ih = self.mouse_texture.size
+
+        scale = 1
+        width = ww / iw / scale
+        height = wh / ih / scale
+        far = 10
+        near = -10
+
+        frust = Matrix4()
+        frust[:] = (2/width, 0, 0, 0,
+                    0, 2/height, 0, 0,
+                    0, 0, -2/(far-near), 0,
+                    0, 0, -(far+near)/(far-near), 1)
+
+        x -= ww / 2
+        y -= wh / 2
+        lx = x / iw / scale
+        ly = y / ih / scale
+
+        view = Matrix4().new_translate(lx, ly, 0)
+
+        return frust * view
+            
     @try_except_log
     def _draw_brush_preview(self, x0, y0, x, y):
 
@@ -581,6 +626,20 @@ class VoxpaintWindow(pyglet.window.Window):
     @lru_cache(1)
     def _make_view_matrix(self, window_size, size, zoom, offset):
         return make_view_matrix(window_size, size, zoom, offset)
+
+    def _update_cursor(self, x, y):
+        over_image = self._over_image(x, y)
+        if over_image:
+            io = imgui.get_io()
+            if io.want_capture_mouse:
+                self.mouse_position = None
+                self.set_mouse_visible(True)
+            else:
+                self.mouse_position = x, y
+                self.set_mouse_visible(False)
+        else:
+            self.mouse_position = None
+            self.set_mouse_visible(True)
     
     @lru_cache(1)
     def _update_border(self, shape):
