@@ -22,6 +22,10 @@ def save_png(data, dest, palette=None):
 
 
 def save_ora(size: Tuple[int, int], layers: List[np.ndarray], palette, path, **kwargs):
+    """
+    An ORA file is basically a zip archive containing an XML manifest and a bunch of PNGs.
+    It can however contain any other application specific data too.
+    """
     w, h = size
     d = len(layers)
     image_el = ET.Element("image", version="0.0.3", w=str(w), h=str(h))
