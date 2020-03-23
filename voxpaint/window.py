@@ -253,7 +253,6 @@ class VoxpaintWindow(pyglet.window.Window):
                 self.view.next_layer()
             else:
                 self.view.prev_layer()
-            self.view.layer_being_switched = True
         else:
             ox, oy = self.offset
             ix, iy = self._to_image_coords(x, y)
@@ -319,13 +318,7 @@ class VoxpaintWindow(pyglet.window.Window):
 
     def on_key_release(self, symbol, modifiers):
 
-        if symbol in {key.S, key.W}:
-            if self.view:
-                self.view.layer_being_switched = False
-            
-        elif symbol in {key.LSHIFT, key.RSHIFT, key.LCTRL, key.RCTRL}:
-            if self.view:
-                self.view.layer_being_switched = False
+        if symbol in {key.LSHIFT, key.RSHIFT, key.LCTRL, key.RCTRL}:
             self.temp_tool = None
             
     def on_draw(self):

@@ -272,7 +272,6 @@ class LayerPickerTool(Tool):
     brush_preview = False
 
     def start(self, view, point, buttons, modifiers):
-        view.layer_being_switched = True
         self._set_layer(view, point)
 
     def draw(self, view, point, buttons, modifiers):
@@ -280,7 +279,6 @@ class LayerPickerTool(Tool):
         
     def finish(self, view, point, buttons, modifiers):
         self._set_layer(view, point)
-        view.layer_being_switched = False
 
     def _set_layer(self, view, point):
         # Find the layer under the cursor

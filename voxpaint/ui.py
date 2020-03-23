@@ -365,7 +365,6 @@ def render_layers(view):
         x, y, z = view.direction
         delta = new_index - index
         view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)
-        view.layer_being_switched = True
         
 
 def render_menu(window):

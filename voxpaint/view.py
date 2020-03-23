@@ -44,6 +44,7 @@ class DrawingView:
         self.cursor = (x if x is not None else x0,
                        y if y is not None else y0,
                        z if z is not None else z0)
+        self.layer_being_switched = True
 
     def layer_visible(self, index):
         if index == self.layer_index:
@@ -162,11 +163,13 @@ class DrawingView:
 
     def next_layer(self):
         x, y, z = self.direction
-        self.move_cursor(x, y, z)        
+        self.move_cursor(x, y, z)
+        self.layer_being_switched = True
 
     def prev_layer(self):
         x, y, z = self.direction
         self.move_cursor(-x, -y, -z)
+        self.layer_being_switched = True
 
     def move_layer(self, d: int):
         index = self.layer_index
