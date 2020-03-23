@@ -1,6 +1,6 @@
 """
 Plugin architecture. Currently very minimal, hacky and fragile.
-The plugin API is also not stable.
+The plugin API is also not stable. At least it's simple!
 """
 
 import inspect
@@ -43,6 +43,15 @@ def init_plugins(window):
                 window.plugins[plugin_name] = plugin.Plugin, params, {}
         except Exception:
             print_exc()
+
+    # Update active plugins
+    for drawing in window.drawings:
+        for name, _ in list(drawing.plugins.items()):
+            plugin, sig, args = window.plugins[name]
+            if inspect.isclass(plugin):
+                drawing.plugins[name] = plugin(), sig, args
+            else:
+                drawing.plugins[name] = window.plugins[name]
             
 
 @try_except_log
