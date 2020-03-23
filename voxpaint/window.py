@@ -348,7 +348,7 @@ class VoxpaintWindow(pyglet.window.Window):
         self._update_border(self.view.shape)
         with self.border_vao, line_program:
             gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
-            r, g, b, a = self.drawing.palette.background_color
+            r, g, b, a = self.drawing.palette.colors[0]  # Color 0 is currently hardcoded background
             gl.glUniform3f(1, r/256, g/256, b/256)
             gl.glDrawArrays(gl.GL_TRIANGLE_FAN, 0, 4)
 
