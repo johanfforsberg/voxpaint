@@ -293,7 +293,10 @@ class VoxpaintWindow(pyglet.window.Window):
         elif symbol == key.R:
             self.tools.select(ToolName.rectangle)
         elif symbol == key.B:
-            self.tools.select(ToolName.brush)
+            if modifiers & key.MOD_SHIFT:
+                self.view.make_brush()
+            else:
+                self.tools.select(ToolName.brush)
             self.overlay and self.overlay.clear_all()
             
         elif symbol == key.Z:
