@@ -437,7 +437,13 @@ def render_menu(window):
             imgui.end_menu()
             
         if imgui.begin_menu("Layer", window.drawing):
-            ...
+
+            if imgui.menu_item("Move layer up", "W", False, window.view.layer_index < window.view.depth - 1)[0]:
+                window.view.move_layer(+1)
+
+            if imgui.menu_item("Move layer down", "S", False, window.view.layer_index > 0)[0]:
+                window.view.move_layer(-1)
+                
             imgui.end_menu()
 
         if imgui.begin_menu("Brush", window.drawing):

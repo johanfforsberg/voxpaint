@@ -103,6 +103,10 @@ class DrawingView:
         return self.data.shape[:2]
 
     @property
+    def depth(self):
+        return self.data.shape[2]    
+    
+    @property
     def layer_index(self):
         "The depth of the current layer index as seen from the user."
         x, y, z = self.direction
