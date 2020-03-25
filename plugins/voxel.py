@@ -106,8 +106,6 @@ layout (binding=0) uniform sampler2D color;
 layout (binding=1) uniform sampler2D normal;
 layout (binding=2) uniform sampler2D position;
 
-layout (binding=4) uniform sampler2D lightDepth;
-
 in VS_OUT {
   vec2 texcoord;
 } fs_in;
@@ -115,7 +113,6 @@ in VS_OUT {
 layout (location = 0) out vec4 color_out;
 
 void main(void) {
-    vec4 pos = texture(position, fs_in.texcoord);
     color_out = texture(color, fs_in.texcoord);
 }
 """
@@ -270,28 +267,10 @@ class Plugin:
 
             mesh.draw(mode=gl.GL_POINTS)
 
-        shadow_buffer = self._get_shadow_buffer(view_size)                
-        with shadow_buffer, self.program, \
-                enabled(gl.GL_DEPTH_TEST), disabled(gl.GL_CULL_FACE):
-            view_matrix = (
-                Matrix4
-                # .new_scale(2/w, 2/h, 1/max(w, h))
-                .new_translate(0, 0, 1)
-                .rotatex(math.pi)
-                .rotatez(azimuth)  # Rotate over time
-            )
-            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE,
-                                  gl_matrix(frust * view_matrix * model_matrix))
-
-            gl.glViewport(0, 0, vw, vh)
-            gl.glPointSize(1.0)
-
-            mesh.draw(mode=gl.GL_POINTS)
-
         final_buffer = self._get_final_buffer(view_size)
 
         with self._vao, final_buffer, self._copy_program, disabled(gl.GL_CULL_FACE, gl.GL_DEPTH_TEST):
-            with offscreen_buffer["color"], offscreen_buffer["normal"], offscreen_buffer["position"], shadow_buffer["depth"]:
+            with offscreen_buffer["color"], offscreen_buffer["normal"], offscreen_buffer["position"]:
                 gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
 
         # TODO must be careful here so that the texture is always valid
