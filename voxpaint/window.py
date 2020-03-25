@@ -72,9 +72,6 @@ class VoxpaintWindow(pyglet.window.Window):
         self.close_unsaved_drawing = None
         self._views = {}
         
-        self.offset = (0, 0)
-        self.zoom = 2
-
         self.keys = key.KeyStateHandler()
         self.push_handlers(self.keys)
 
@@ -159,7 +156,23 @@ class VoxpaintWindow(pyglet.window.Window):
     def brush(self):
         if self.drawing:
             return self.drawing.brush or self._brush
-    
+
+    @property
+    def zoom(self):
+        return self.view.zoom
+
+    @zoom.setter
+    def zoom(self, value):
+        self.view.zoom = value
+
+    @property
+    def offset(self):
+        return self.view.offset
+
+    @offset.setter
+    def offset(self, value):
+        self.view.offset = value        
+        
     @no_imgui_events
     def on_mouse_press(self, x, y, button, modifiers):
         

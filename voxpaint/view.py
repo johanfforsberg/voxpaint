@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 from euclid3 import Vector3
 import numpy as np
 
-from .brush import ImageBrush
+from .brush import Brush, ImageBrush
 from .draw import draw_line, draw_rectangle, blit
 from .rect import Rectangle
 from .util import AutoResetting
@@ -15,8 +15,17 @@ from .util import AutoResetting
 class DrawingView:
 
     """
-    A particular "view" of a drawing. As of now only 90 degree rotations are supported.
-    Most access to a drawing should be through a view.
+    A particular "view" of a drawing. Most access to a drawing should be through
+    a view.
+    
+    The view holds most of the application state related to a drawing, like
+    zoom and pan offset.
+
+    It can also apply transformations to the drawing. As of now only 90 degree
+    rotations are supported. 
+    
+    A "layer" is only meaningful in the context of a given view, and refers to
+    slices of the drawing perpendicular to the current "z" direction. 
     """
 
     layer_being_switched = AutoResetting(False)
@@ -25,19 +34,16 @@ class DrawingView:
         self.drawing = drawing  # The underlying data
         self.rotation = rotation  # The transform
         self.cursor = (0, 0, 0)  # Position of the "current" layer in each dimension
+
+        self.offset = (0, 0)
+        self.zoom = 2
         
         self.show_only_current_layer = False
 
-    def rotate(self, dx=0, dy=0, dz=0):
+    def rotate(self, dx: int=0, dy: int=0, dz: int=0):
+        "Rotation is given in whole multiples of 90 degrees."
         pitch, yaw, roll = self.rotation
         self.rotation = (pitch + dx) % 4, (yaw + dy) % 4, (roll + dz) % 4
-
-    def move_cursor(self, dx=0, dy=0, dz=0):
-        x, y, z = self.cursor
-        w, h, d = self.drawing.data.shape
-        self.cursor = (min(w-1, max(0, x + dx)),
-                       min(h-1, max(0, y + dy)),
-                       min(d-1, max(0, z + dz)))
 
     def set_cursor(self, x=None, y=None, z=None):
         x0, y0, z0 = self.cursor
@@ -45,6 +51,14 @@ class DrawingView:
                        y if y is not None else y0,
                        z if z is not None else z0)
         self.layer_being_switched = True
+        
+    def move_cursor(self, dx=0, dy=0, dz=0):
+        "Move the cursor relative to current position."
+        x, y, z = self.cursor
+        w, h, d = self.drawing.data.shape
+        self.cursor = (min(w-1, max(0, x + dx)),
+                       min(h-1, max(0, y + dy)),
+                       min(d-1, max(0, z + dz)))
 
     def layer_visible(self, index):
         if index == self.layer_index:
@@ -81,6 +95,7 @@ class DrawingView:
         That means the direction in which the layer structure is stacked,
         i.e. "up". The "layer_index" tells where along this axis the cursor is.
         """
+        # TODO This is pretty crude. Also, use numpy instead of euclid?
         rx, ry, rz = rotation
         v = Vector3(0, 0, 1)
         zaxis = Vector3(0, 0, 1)
@@ -119,7 +134,7 @@ class DrawingView:
         if z:
             return cz if z == 1 else d - cz - 1
 
-    def layer(self, index=None):
+    def layer(self, index: int=None):
         index = index if index is not None else self.layer_index
         return self.data[:, :, index]
 
@@ -132,13 +147,11 @@ class DrawingView:
     def overlay(self):
         """
         The overlay is a temporary layer that is used for drawing in real time.
-        When an operation is done (e.g. a pencil stroke) the overlay is copied
-        into the drawing data (via an Edit, to make it undoable).
         """
         return self._get_overlay(self.shape[:2])
 
     @lru_cache(3)
-    def _get_overlay(self, size):
+    def _get_overlay(self, size: Tuple[int, int]):
         return Overlay(size)
 
     @property
@@ -147,7 +160,7 @@ class DrawingView:
         return self._get_dirty(self.rotation)
 
     @lru_cache(1)
-    def _get_dirty(self, rot):
+    def _get_dirty(self, rot: Tuple[int, int, int]):
         w, h, d = self.shape
         rect = Rectangle(size=(w, h))
         return {index: rect for index in range(d)}
@@ -155,9 +168,6 @@ class DrawingView:
     def modify(self, slc3: Tuple[slice, slice, slice], data, tool):
         self.drawing.modify(slc3, data, self.rotation, tool)
 
-    def modify_layer(self, index, slc2, data, tool):
-        self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
-        
     def undo(self):
         self.drawing.undo()
         self._get_dirty.cache_clear()
@@ -176,6 +186,9 @@ class DrawingView:
         self.move_cursor(-x, -y, -z)
         self.layer_being_switched = True
 
+    def modify_layer(self, index: int, slc2: Tuple[slice, slice], data: np.ndarray, tool):
+        self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
+                
     def move_layer(self, d: int):
         from_index = self.layer_index
         to_index = from_index + d
@@ -198,7 +211,11 @@ class DrawingView:
         
 class Overlay:
 
-    "A temporary 'layer' used for realtime preview of changes."
+    """
+    A temporary 'layer' used for realtime preview of changes. Drawing strokes
+    happen in an overlay until they are finished, and then the data is transfered
+    to the current layer, via an Edit.
+    """
     
     def __init__(self, size: Tuple[int, int]):
         self.size = size
@@ -221,7 +238,7 @@ class Overlay:
             self.dirty = rect.unite(self.dirty)
         return rect
 
-    def blit_brush(self, brush, p, color=0):
+    def blit_brush(self, brush, p: Tuple[int, int], color: int=0):
         x, y = p
         dx, dy = brush.center
         # dx, dy = 0, 0
@@ -235,7 +252,7 @@ class Overlay:
         self.dirty = rect.unite(self.dirty)
         return rect
     
-    def draw_line(self, brush, p0, p1, color=0):
+    def draw_line(self, brush: Brush, p0: Tuple[int, int], p1: Tuple[int, int], color: int=0):
         x0, y0 = p0
         x1, y1 = p1
         dx, dy = brush.center
@@ -245,7 +262,7 @@ class Overlay:
         self.dirty = rect.unite(self.dirty)
         return rect
 
-    def draw_rectangle(self, brush, pos, size, color=0, fill=False):
+    def draw_rectangle(self, brush: Brush, pos, size, color=0, fill=False):
         x, y = pos
         dx, dy = brush.center
         data = brush.get_draw_data(color)
@@ -258,11 +275,3 @@ class Overlay:
     # TODO to be implemented
     # def draw_ellipse(self, brush, pos, size, color=0, fill=False):
     #     pass
-
-    def shift(self, dx=0, dy=0, dz=0):
-        data = self.data.copy()
-        self.data = 0
-        x, y, z = self.shape
-        #self.data[max(0, dx):min(x, x+dx), max(0, dy):min(y, y+dy), max(0, dz):min(z, z+dz)] +=
-        
-        #self.modify(0, data[max(0, -dx):min(x, x-dx), max(0, -dy):max(y, y-dy), max(0, -dz):max(z, z-dz)]

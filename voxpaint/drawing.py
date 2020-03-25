@@ -23,8 +23,8 @@ class Drawing:
     Keeps the data for a drawing. Should normally only be accessed via a DrawingView.
     """
 
-    def __init__(self, size:Optional[Shape]=None, data:Optional[np.ndarray]=None, palette:Palette=None,
-                 path=None):
+    def __init__(self, size: Optional[Shape]=None, data: Optional[np.ndarray]=None, palette: Palette=None,
+                 path: str=None):
         if data is not None:
             self.data = data
         elif size:
@@ -107,9 +107,6 @@ class Drawing:
         return [self.data[:, :, i] for i in range(self.data.shape[2])]
         
     def modify(self, slc, data, rotation, tool):
-        # TODO This seems a little over complicated; seems like it
-        # should be possible to find the slice in the original data to
-        # use.
         edit = LayerEdit.create(self, slc, data, rotation, tool)
         edit.perform(self)
         self.undos.append(edit)
