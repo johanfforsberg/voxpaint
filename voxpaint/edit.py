@@ -64,3 +64,22 @@ class PaletteEdit(Edit):
         drawing.palette.set_colors(self.start_index, self.orig_data)
 
 
+@dataclass(frozen=True)
+class LayerSwapEdit(Edit):
+
+    "Swap places between two layers."
+    
+    index1: int
+    index2: int
+    rotation: tuple
+
+    def perform(self, drawing):
+        view = drawing.get_view(rotation=self.rotation)
+        layer1 = view.layer(self.index1)
+        layer2 = view.layer(self.index2).copy()
+        view.data[:, :, self.index2] = layer1
+        view.data[:, :, self.index1] = layer2
+
+    revert = perform  # This is a symmetric operation
+
+        

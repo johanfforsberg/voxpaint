@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from .edit import LayerEdit, PaletteEdit
+from .edit import LayerEdit, PaletteEdit, LayerSwapEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
@@ -121,6 +121,13 @@ class Drawing:
         edit = PaletteEdit(start_i, orig_colors, colors)
         self.undos.append(edit)
         edit.perform(self)
+        self.version += 1
+
+    def move_layer(self, from_index, to_index, rotation):
+        edit = LayerSwapEdit(from_index, to_index, rotation)
+        edit.perform(self)
+        self.undos.append(edit)
+        self.redos.clear()
         self.version += 1
         
     def undo(self):

@@ -61,6 +61,7 @@ class DrawingView:
         data = self.drawing.data
         rx, ry, rz = rotation
         # TODO this seems correct at least for the limited rotating we currently do...
+        # But do figure out a more elegant way.
         if rz:
             data = np.rot90(data, rz, (0, 1))
         if rx:
@@ -172,17 +173,14 @@ class DrawingView:
         self.layer_being_switched = True
 
     def move_layer(self, d: int):
-        index = self.layer_index
-        other_index = index + d
-        if not 0 <= other_index < self.shape[2]:
-            return
-        current_layer = self.layer()
-        above_layer = self.layer(index + d).copy()
-        self.data[:, :, index + d] = current_layer
-        self.data[:, :, index] = above_layer
-        deltas = [d * a for a in self.direction]
-        self.move_cursor(*deltas)
-        self.drawing.version += 1
+        from_index = self.layer_index
+        to_index = from_index + d
+        depth = self.data.shape[2]
+        if (from_index != to_index) and (0 <= from_index < depth) and (0 <= to_index < depth):
+            self.drawing.move_layer(from_index, to_index, self.rotation)
+            deltas = [d * a for a in self.direction]
+            self.move_cursor(*deltas)
+            self.dirty[from_index] = self.dirty[to_index] = True  # TODO make this smarter
 
     def make_brush(self, rect: Optional[Rectangle]=None, clear: bool=False):
         if rect:

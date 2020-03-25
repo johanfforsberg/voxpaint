@@ -72,7 +72,7 @@ def render_view(window):
             if dirty and drawing.lock.acquire(timeout=0.01):
                 layer = data[:, :, i]
                 layer_data = layer.tobytes("F")  # TODO maybe there's a better way?
-                gl.glTextureSubImage2D(tex.name, 0, 0, 0, w, h,
+                gl.glTextureSubImage2D(tex.name, 0, 0, 0, w, h,  # TODO use dirty rect
                                        gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
                                        layer_data)
                 view.dirty[i] = None

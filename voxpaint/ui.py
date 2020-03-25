@@ -359,7 +359,7 @@ def render_layers(view):
     layers = list(view.layers)
     n_layers = len(layers)
     index = view.layer_index
-    changed, new_index = imgui.v_slider_int("##layer_index", 30, 200, index,
+    changed, new_index = imgui.v_slider_int("##layer_index", 30, 100, index,
                                             min_value=0, max_value=n_layers - 1)
     if changed:
         x, y, z = view.direction
@@ -472,8 +472,8 @@ def render_menu(window):
         if drawing:
             imgui.text(f"{drawing.filename} {drawing.size}")
 
-            imgui.set_cursor_screen_pos((w - 270, 0))
-            imgui.text(f"Zoom: x{2**window.zoom}")
+            imgui.set_cursor_screen_pos((w - 370, 0))
+            imgui.text(f"Zoom: {2**window.zoom}x  Rot: {window.view.rotation}")
             
             if window.mouse_position:
                 imgui.set_cursor_screen_pos((w - 150, 0))
