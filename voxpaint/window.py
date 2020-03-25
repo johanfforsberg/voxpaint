@@ -268,17 +268,21 @@ class VoxpaintWindow(pyglet.window.Window):
             self.view.rotate(dz=-1)
         elif symbol in {key.RIGHT, key.D}:
             self.view.rotate(dz=1)
+        elif symbol in {key.UP}:
+            self.view.rotate(dx=-1)
+        elif symbol in {key.DOWN}:
+            self.view.rotate(dx=1)        
             
-        elif symbol in {key.UP, key.W}:
+        elif symbol in {key.W}:
             if modifiers & key.MOD_SHIFT:
                 self.view.move_layer(1)
             else:
-                self.view.rotate(dx=-1)
-        elif symbol in {key.DOWN, key.S}:
+                self.view.next_layer()
+        elif symbol in {key.S}:
             if modifiers & key.MOD_SHIFT:
                 self.view.move_layer(-1)
             else:
-                self.view.rotate(dx=1)
+                self.view.prev_layer()
         
         elif symbol == key.O:
             self.view.show_only_current_layer = not self.view.show_only_current_layer
