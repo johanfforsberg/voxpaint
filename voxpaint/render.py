@@ -11,12 +11,6 @@ from fogl.vao import VertexArrayObject
 from .texture import IntegerTexture, ByteIntegerTexture
 
 
-draw_program = Program(VertexShader("glsl/palette_vert.glsl"),
-                       FragmentShader("glsl/palette_frag.glsl"))
-
-vao = VertexArrayObject()
-
-
 EMPTY_COLOR = (gl.GLfloat * 4)(0, 0, 0, 0)
 
 
@@ -32,6 +26,9 @@ def render_view(window):
     
     gl.glClearBufferfv(gl.GL_COLOR, 0, (gl.GLfloat * 4)(0.25, 0.25, 0.25, 1))
 
+    vao = _get_vao()
+    draw_program = _get_program()
+    
     with vao, ob, draw_program:
         gl.glViewport(0, 0, w, h)
 
@@ -88,6 +85,17 @@ def render_view(window):
         gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
 
     return ob
+
+
+@lru_cache(1)
+def _get_vao():
+    return VertexArrayObject()
+
+
+@lru_cache(1)
+def _get_program():
+    return Program(VertexShader("glsl/palette_vert.glsl"),
+                   FragmentShader("glsl/palette_frag.glsl"))
 
 
 @lru_cache(1)

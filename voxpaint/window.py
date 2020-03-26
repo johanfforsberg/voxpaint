@@ -35,19 +35,6 @@ from .util import (make_view_matrix, try_except_log, Selectable, Selectable2, no
                    show_load_dialog, show_save_dialog, debounce)
 
 
-vao = VertexArrayObject()
-
-
-draw_program = Program(VertexShader("glsl/palette_vert.glsl"),
-                       FragmentShader("glsl/palette_frag.glsl"))
-
-copy_program = Program(VertexShader("glsl/copy_vert.glsl"),
-                       FragmentShader("glsl/copy_frag.glsl"))
-
-line_program = Program(VertexShader("glsl/triangle_vert.glsl"),
-                       FragmentShader("glsl/triangle_frag.glsl"))
-
-
 EMPTY_COLOR = (gl.GLfloat * 4)(0, 0, 0, 0)
 
 
@@ -62,6 +49,17 @@ class VoxpaintWindow(pyglet.window.Window):
         super().__init__(*args, **kwargs, caption="Voxpaint", resizable=True, vsync=False)
 
         self.recent_files = OrderedDict((k, None) for k in recent_files)
+
+        self.vao = VertexArrayObject()
+
+        self.draw_program = Program(VertexShader("glsl/palette_vert.glsl"),
+                                    FragmentShader("glsl/palette_frag.glsl"))
+
+        self.copy_program = Program(VertexShader("glsl/copy_vert.glsl"),
+                                    FragmentShader("glsl/copy_frag.glsl"))
+
+        self.line_program = Program(VertexShader("glsl/triangle_vert.glsl"),
+                                    FragmentShader("glsl/triangle_frag.glsl"))
         
         if path:
             self.drawings = Selectable([Drawing.from_ora(path)])
@@ -111,8 +109,6 @@ class VoxpaintWindow(pyglet.window.Window):
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.mouse_event_queue = None
 
-        self.vao = VertexArrayObject()
-        
         self.imgui_renderer = PygletRenderer(self)
         io = imgui.get_io()
         self._font = io.fonts.add_font_from_file_ttf(
@@ -368,13 +364,13 @@ class VoxpaintWindow(pyglet.window.Window):
         gl.glViewport(0, 0, *window_size)
 
         self._update_border(self.view.shape)
-        with self.border_vao, line_program:
+        with self.border_vao, self.line_program:
             gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
             r, g, b, a = self.drawing.palette.colors[0]  # Color 0 is currently hardcoded background
             gl.glUniform3f(1, r/256, g/256, b/256)
             gl.glDrawArrays(gl.GL_TRIANGLE_FAN, 0, 4)
 
-        with self.vao, copy_program:
+        with self.vao, self.copy_program:
             # Draw the actual drawing
             with ob["color"]:
                 gl.glEnable(gl.GL_BLEND)
@@ -382,7 +378,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
             self._draw_mouse_cursor()            
 
-        with self.border_vao, line_program:                
+        with self.border_vao, self.line_program:                
             gl.glUniform3f(1, 0., 0., 0.)
             gl.glLineWidth(1)
             gl.glDrawArrays(gl.GL_LINE_LOOP, 0, 4)
@@ -390,7 +386,7 @@ class VoxpaintWindow(pyglet.window.Window):
         if self.stroke_tool and self.stroke_tool.show_rect:
             if self.stroke_tool.rect:
                 self._update_tool_rect(self.stroke_tool.rect)
-                with self.tool_rect_vao, line_program:
+                with self.tool_rect_vao, self.line_program:
                     gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
                     gl.glUniform3f(1, 1., 1., 0.)
                     gl.glLineWidth(1)
