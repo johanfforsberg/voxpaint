@@ -255,7 +255,7 @@ def render_palette(drawing: Drawing):
     if imgui.is_item_hovered():
         io = imgui.get_io()
         delta = int(io.mouse_wheel)
-        current_color_page = min(max(current_color_page + delta, 0), max_pages)
+        current_color_page = min(max(current_color_page - delta, 0), max_pages)
 
     palette.foreground = fg
     palette.background = bg

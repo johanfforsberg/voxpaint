@@ -104,6 +104,8 @@ class VoxpaintWindow(pyglet.window.Window):
         self.stroke = None
         self.stroke_tool = None
 
+        self._error = None
+
         self.mouse_position = None
 
         self.executor = ThreadPoolExecutor(max_workers=1)
@@ -361,7 +363,7 @@ class VoxpaintWindow(pyglet.window.Window):
 
         ob = render_view(self)
         
-        vm = self._make_view_matrix(window_size, size, self.zoom, self.offset)
+        vm = make_view_matrix(window_size, size, self.zoom, self.offset)
         vm = (gl.GLfloat*16)(*vm)
         gl.glViewport(0, 0, *window_size)
 
@@ -428,6 +430,15 @@ class VoxpaintWindow(pyglet.window.Window):
                 
             ui.render_new_drawing_popup(self)
 
+            if self._error:
+                imgui.open_popup("Error")
+                if imgui.begin_popup_modal("Error")[0]:
+                    imgui.text(self._error)
+                    if imgui.button("Doh!"):
+                        self._error = None
+                        imgui.close_current_popup()
+                    imgui.end_popup()
+            
         imgui.render()
         imgui.end_frame()
         data = imgui.get_draw_data()
@@ -492,13 +503,16 @@ class VoxpaintWindow(pyglet.window.Window):
 
         def really_load_drawing(path):
             if path:
-                if path.endswith(".ora"):
-                    drawing = Drawing.from_ora(path)
-                elif path.endswith(".png"):
-                    drawing = Drawing.from_png(path)
-                self.drawings.append(drawing)
-                self.drawings.select(drawing)
-                self._add_recent_file(path)
+                try:
+                    if path.endswith(".ora"):
+                        drawing = Drawing.from_ora(path)
+                    elif path.endswith(".png"):
+                        drawing = Drawing.from_png(path)
+                    self.drawings.append(drawing)
+                    self.drawings.select(drawing)
+                    self._add_recent_file(path)
+                except NotImplementedError as nie:
+                    self._error = str(nie)
 
         if path:
             really_load_drawing(path)
@@ -546,10 +560,6 @@ class VoxpaintWindow(pyglet.window.Window):
                 del self.recent_files[f]
                 break
             
-    @lru_cache(1)
-    def _make_view_matrix(self, window_size, size, zoom, offset):
-        return make_view_matrix(window_size, size, zoom, offset)
-        
     @lru_cache(1)
     def _to_image_coords(self, x: float, y: float) -> Tuple[float, float]:
         "Convert window coordinates to image coordinates."
@@ -645,10 +655,6 @@ class VoxpaintWindow(pyglet.window.Window):
         pos = (int(ix), int(iy))
         self.overlay.blit_brush(brush, pos, self.drawing.palette.foreground)
     
-    @lru_cache(1)
-    def _make_view_matrix(self, window_size, size, zoom, offset):
-        return make_view_matrix(window_size, size, zoom, offset)
-
     def _update_cursor(self, x, y):
         over_image = self._over_image(x, y)
         if over_image:

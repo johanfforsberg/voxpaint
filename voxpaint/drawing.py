@@ -5,6 +5,7 @@ from threading import RLock
 from uuid import uuid4
 
 import numpy as np
+import png
 
 from .edit import LayerEdit, PaletteEdit, LayerSwapEdit
 from .ora import load_ora, save_ora
@@ -74,6 +75,16 @@ class Drawing:
     @property
     def brush(self):
         return self.brushes.current
+
+    @classmethod
+    def from_png(cls, path):
+        reader = png.Reader(filename=path)
+        w, h, image_data, info = reader.read()
+        if "palette" not in info:
+            raise NotImplementedError("Can't load non palette based PNG images.")
+        data = np.vstack(list(map(np.uint8, image_data))).T
+        palette = Palette(info["palette"])
+        return cls(data=np.dstack([data]), palette=palette, path=path)
     
     @classmethod
     def from_ora(cls, path):
