@@ -425,19 +425,27 @@ def render_menu(window):
 
             imgui.separator()
             
-            if imgui.menu_item("Rotate up", "w", False, True)[0]:
+            if imgui.menu_item("Rotate up", "UP", False, True)[0]:
                 window.view.rotate(dx=-1)
-            if imgui.menu_item("Rotate down", "s", False, True)[0]:
+            if imgui.menu_item("Rotate down", "DOWN", False, True)[0]:
                 window.view.rotate(dx=1)
-            if imgui.menu_item("Rotate left", "a", False, True)[0]:
+            if imgui.menu_item("Rotate left", "LEFT", False, True)[0]:
                 window.view.rotate(dz=-1)
-            if imgui.menu_item("Rotate right", "d", False, True)[0]:
+            if imgui.menu_item("Rotate right", "RIGHT", False, True)[0]:
                 window.view.rotate(dz=1)
                 
             imgui.end_menu()
             
         if imgui.begin_menu("Layer", window.drawing):
 
+            if imgui.menu_item("Next layer", "w", False, window.view.layer_index < window.view.depth - 1)[0]:
+                window.view.next_layer()
+
+            if imgui.menu_item("Previous layer", "s", False, window.view.layer_index > 0)[0]:
+                window.view.prev_layer()
+
+            imgui.separator()
+            
             if imgui.menu_item("Move layer up", "W", False, window.view.layer_index < window.view.depth - 1)[0]:
                 window.view.move_layer(+1)
 
