@@ -342,6 +342,7 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_draw(self):
         self._render_view()
         self._render_gui()
+        gl.glFinish()  # TODO This seems important; figure out why and if it's the best way.
 
     def on_close(self):
         self._quit()
