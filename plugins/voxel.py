@@ -213,7 +213,7 @@ class Plugin:
         return (gl.GLfloat*(4*256))(*float_colors)
         
     def __call__(self, voxpaint, drawing, 
-                 altitude: float=120, azimuth: float=45, spin: bool=False, z: int=100):
+                 altitude: float=120, azimuth: float=45, spin: bool=False):
 
         size = drawing.size
         depth = len(drawing.layers)
