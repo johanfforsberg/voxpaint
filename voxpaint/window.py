@@ -294,7 +294,9 @@ class VoxpaintWindow(pyglet.window.Window):
                 self.view.move_layer(-1)
             else:
                 self.view.prev_layer()
-        
+                
+        elif symbol == key.V:
+            self.view.toggle_layer()
         elif symbol == key.O:
             self.view.show_only_current_layer = not self.view.show_only_current_layer
         

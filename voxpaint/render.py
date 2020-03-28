@@ -40,16 +40,13 @@ def render_view(window):
 
     # Update the image texture
     gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for writing 8bit data
-    drawing_texture = _get_3d_texture(view.shape)        
+    drawing_texture = _get_3d_texture(view.shape)
     for i in range(d):
-
-        # if not view.layer_visible(i):
-        #     continue
 
         dirty = view.dirty[i]
         if dirty and drawing.lock.acquire(timeout=0.01):
             layer = data[:, :, i]
-            layer_data = layer.tobytes("F")  # TODO maybe there's a better way?
+            layer_data = layer.tobytes(order="F")  # TODO maybe there's a better way?
             gl.glTextureSubImage3D(drawing_texture.name, 0,
                                    0, 0, i, w, h, 1,  # TODO use dirty rect
                                    gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,

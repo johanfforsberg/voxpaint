@@ -451,6 +451,11 @@ def render_menu(window):
 
             if imgui.menu_item("Move layer down", "S", False, window.view.layer_index > 0)[0]:
                 window.view.move_layer(-1)
+
+            imgui.separator()
+
+            if imgui.menu_item("Visibility", "V", window.view.layer_visible, True)[0]:
+                window.view.toggle_layer()
                 
             imgui.end_menu()
 

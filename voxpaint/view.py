@@ -37,6 +37,8 @@ class DrawingView:
 
         self.offset = (0, 0)
         self.zoom = 2
+
+        self.hidden_layers = ()
         
         self.show_only_current_layer = False
 
@@ -60,17 +62,17 @@ class DrawingView:
                        min(h-1, max(0, y + dy)),
                        min(d-1, max(0, z + dz)))
 
-    def layer_visible(self, index):
-        if index == self.layer_index:
-            return True
-        return not self.show_only_current_layer and not self.layer_being_switched
+    @property
+    def layer_visible(self, index=None):
+        index = self.layer_index if index is None else index
+        return index not in self.hidden_layers
         
     @property
     def data(self):
-        return self._get_data(self.rotation)
+        return self._get_data(self.rotation, self.hidden_layers)
 
     @lru_cache(1)
-    def _get_data(self, rotation: Tuple[int, int, int]):
+    def _get_data(self, rotation: Tuple[int, int, int], hidden_layers=Tuple[int]):
         " Return a ndarray view on the drawing data, rotated properly. "
         data = self.drawing.data
         rx, ry, rz = rotation
@@ -82,7 +84,9 @@ class DrawingView:
             data = np.rot90(data, rx, (1, 2))
         if ry:
             data = np.rot90(data, ry, (2, 0))
-        return data
+        masked_data = np.ma.masked_array(data, fill_value=0)
+        masked_data[:, :, hidden_layers] = np.ma.masked
+        return masked_data
                     
     @property
     def direction(self):
@@ -198,17 +202,42 @@ class DrawingView:
             deltas = [d * a for a in self.direction]
             self.move_cursor(*deltas)
             self.dirty[from_index] = self.dirty[to_index] = True  # TODO make this smarter
+            if from_index in self.hidden_layers:
+                hidden = set(self.hidden_layers)
+                hidden.remove(from_index)
+                hidden.add(to_index)
+                self.hidden_layers = tuple(sorted(hidden))
 
     def make_brush(self, rect: Optional[Rectangle]=None, clear: bool=False):
         if rect:
-            print(rect)
             data = self.layer()[rect.as_slice()].copy()
         else:
             data = self.layer().copy()
         brush = ImageBrush(data=data)
         self.drawing.brushes.append(brush)
-        
-        
+
+    def hide_layer(self, index=None):
+        index = self.layer_index if index is None else index
+        hidden = set(self.hidden_layers)
+        hidden.add(index)
+        self.dirty[index] = True
+        self.hidden_layers = tuple(sorted(hidden))
+
+    def show_layer(self, index=None):
+        index = self.layer_index if index is None else index
+        hidden = set(self.hidden_layers)
+        hidden.remove(index)
+        self.dirty[index] = True
+        self.hidden_layers = tuple(sorted(hidden))
+
+    def toggle_layer(self, index=None):
+        index = self.layer_index if index is None else index
+        if index in self.hidden_layers:
+            self.show_layer(index)
+        else:
+            self.hide_layer(index)
+
+            
 class Overlay:
 
     """
