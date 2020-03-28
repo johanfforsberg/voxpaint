@@ -19,7 +19,7 @@ class DrawingView:
     a view.
     
     The view holds most of the application state related to a drawing, like
-    zoom and pan offset.
+    zoom and pan offset, as well as layer visibility.
 
     It can also apply transformations to the drawing. As of now only 90 degree
     rotations are supported. 
@@ -38,7 +38,10 @@ class DrawingView:
         self.offset = (0, 0)
         self.zoom = 2
 
-        self.hidden_layers = ()
+        # This might be a bit confusing, but currently the visibility of layers
+        # is tied to a specific view. I think it would be even more confusing
+        # to do it any other way though...
+        self.hidden_layers = ()  # Note that this must be a tuple due to caching
         
         self.show_only_current_layer = False
 
@@ -84,9 +87,13 @@ class DrawingView:
             data = np.rot90(data, rx, (1, 2))
         if ry:
             data = np.rot90(data, ry, (2, 0))
-        masked_data = np.ma.masked_array(data, fill_value=0)
-        masked_data[:, :, hidden_layers] = np.ma.masked
-        return masked_data
+        # Layer visibility is implemented using a masked array. This makes it
+        # pretty much transparent (ho ho) to the rest of the application.
+        if hidden_layers:
+            masked_data = np.ma.masked_array(data, fill_value=0)
+            masked_data[:, :, hidden_layers] = np.ma.masked
+            return masked_data
+        return data
                     
     @property
     def direction(self):
