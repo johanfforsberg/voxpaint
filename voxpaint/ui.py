@@ -433,6 +433,9 @@ def render_menu(window):
                 window.view.rotate(dz=-1)
             if imgui.menu_item("Rotate right", "RIGHT", False, True)[0]:
                 window.view.rotate(dz=1)
+
+            if imgui.menu_item("Reset rotation", "", False, True)[0]:
+                window.view.rotation = (0, 0, 0)
                 
             imgui.end_menu()
             

@@ -41,7 +41,7 @@ class DrawingView:
         # This might be a bit confusing, but currently the visibility of layers
         # is tied to a specific view. I think it would be even more confusing
         # to do it any other way though...
-        self.hidden_layers = ()  # Note that this must be a tuple due to caching
+        self.hidden_layers: Tuple[int, ...] = ()  # Note that this must be a tuple due to caching
         
         self.show_only_current_layer = False
 
