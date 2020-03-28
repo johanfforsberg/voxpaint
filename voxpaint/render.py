@@ -43,12 +43,11 @@ def render_view(window):
     drawing_texture = _get_3d_texture(view.shape)        
     for i in range(d):
 
-        if not view.layer_visible(i):
-            continue
+        # if not view.layer_visible(i):
+        #     continue
 
         dirty = view.dirty[i]
         if dirty and drawing.lock.acquire(timeout=0.01):
-            print("hej")
             layer = data[:, :, i]
             layer_data = layer.tobytes("F")  # TODO maybe there's a better way?
             gl.glTextureSubImage3D(drawing_texture.name, 0,
@@ -64,13 +63,15 @@ def render_view(window):
     vao = _get_vao()
     draw_program = _get_program()
     empty_texture = _get_empty_texture(size)
-    
+
+    other_layer_alpha = 0.3 if view.show_only_current_layer or view.layer_being_switched else 1.0
+
     with vao, offscreen_buffer:
 
         gl.glEnable(gl.GL_BLEND)
         gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-        gl.glClearBufferfv(gl.GL_COLOR, 0, EMPTY_COLOR)
         gl.glViewport(0, 0, w, h)
+        gl.glClearBufferfv(gl.GL_COLOR, 0, EMPTY_COLOR)
 
         with draw_program, drawing_texture:
 
@@ -79,7 +80,7 @@ def render_view(window):
             # Draw the layers below the current one
             if cursor_pos > 0:
                 with empty_texture:
-                    gl.glUniform1f(1, 1)
+                    gl.glUniform1f(1, other_layer_alpha)
                     gl.glUniform2i(2, 0, cursor_pos)
                     gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
 
@@ -92,7 +93,7 @@ def render_view(window):
             # Draw the layers on top
             if cursor_pos < d - 1:
                 with empty_texture:
-                    gl.glUniform1f(1, 1)
+                    gl.glUniform1f(1, other_layer_alpha)
                     gl.glUniform2i(2, cursor_pos + 1, d)
                     gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
 
