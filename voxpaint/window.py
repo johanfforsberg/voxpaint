@@ -6,7 +6,7 @@ from traceback import print_exc
 import os
 from queue import Queue
 
-from euclid3 import Matrix4
+from euclid3 import Matrix4, Vector3
 import imgui
 import pyglet
 from pyglet import gl

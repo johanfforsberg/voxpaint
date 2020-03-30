@@ -1,5 +1,6 @@
 from functools import lru_cache
 from inspect import isclass
+from itertools import chain
 import logging
 from math import floor, ceil
 import os
@@ -189,10 +190,14 @@ def render_palette(drawing: Drawing):
     width = int(imgui.get_window_content_region_width()) // 20
 
     imgui.push_style_color(imgui.COLOR_FRAME_BACKGROUND, 0, 0, 0)
-    
-    for i, color in enumerate(palette.colors[start_color:start_color + 64], start_color):
-        is_foreground = i == fg
-        is_background = (i == bg) * 2
+
+    colors = palette.colors
+
+    # Order the colors by column instead of by row (which is the order we draw them)
+    for i, c in enumerate(chain.from_iterable(zip(range(0, 16), range(16, 32), range(32, 48), range(48, 64)))):
+        color = colors[start_color + c]
+        is_foreground = c == fg
+        is_background = (c == bg) * 2
         selection = is_foreground | is_background
         color = as_float(color)
 
@@ -207,7 +212,7 @@ def render_palette(drawing: Drawing):
             #     else:
             #         temp_vars["spread_start"] = i
             # else:
-            fg = i
+            fg = c
 
         if i % width != width - 1:
             imgui.same_line()
@@ -229,12 +234,12 @@ def render_palette(drawing: Drawing):
 
         if imgui.core.is_item_clicked(2):
             # Right button sets background
-            bg = i
+            bg = c
 
         # Drag and drop (currently does not accomplish anything though)
         if imgui.begin_drag_drop_source():
-            imgui.set_drag_drop_payload('start_index', i.to_bytes(1, sys.byteorder))
-            imgui.color_button(f"color {i}", *color[:3], 1, 0, 20, 20)
+            imgui.set_drag_drop_payload('start_index', c.to_bytes(1, sys.byteorder))
+            imgui.color_button(f"color {c}", *color[:3], 1, 0, 20, 20)
             imgui.end_drag_drop_source()
         if imgui.begin_drag_drop_target():
             start_index = imgui.accept_drag_drop_payload('start_index')
@@ -242,7 +247,7 @@ def render_palette(drawing: Drawing):
                 start_index = int.from_bytes(start_index, sys.byteorder)
                 io = imgui.get_io()
                 image_only = io.key_shift
-                drawing.swap_colors(start_index, i, image_only=image_only)
+                drawing.swap_colors(start_index, c, image_only=image_only)
                 palette.clear_overlay()
             imgui.end_drag_drop_target()
 
