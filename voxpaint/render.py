@@ -1,6 +1,7 @@
 from functools import lru_cache
 from itertools import chain
 
+import numpy as np
 from pyglet import gl
 
 from fogl.framebuffer import FrameBuffer
@@ -20,7 +21,7 @@ def render_view(window):
 
     drawing = window.drawing
     view = window.view
-    data = view.data
+    data = drawing.data
     w, h, d = view.shape
     size = w, h
     offscreen_buffer = _get_offscreen_buffer(size)
@@ -40,11 +41,9 @@ def render_view(window):
 
     # Update the image texture
     gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for writing 8bit data
-    drawing_texture = _get_3d_texture(view.shape)
-    for i in range(d):
-
-        dirty = view.dirty[i]
-        if dirty and drawing.lock.acquire(timeout=0.01):
+    drawing_texture = _get_3d_texture(data.shape)
+    for i, dirty in list(view.dirty.items()):
+        if drawing.lock.acquire(timeout=0.01):
             layer = data[:, :, i]
             layer_data = layer.tobytes(order="F")  # TODO maybe there's a better way?
             gl.glTextureSubImage3D(drawing_texture.name, 0,
@@ -55,13 +54,16 @@ def render_view(window):
     gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
 
     # Render everything to the offscreen buffer
-    cursor_pos = view.layer_index
+    cursor_pos = d - view.layer_index - 1
 
     vao = _get_vao()
     draw_program = _get_program()
     empty_texture = _get_empty_texture(size)
 
     other_layer_alpha = 0.3 if view.show_only_current_layer or view.layer_being_switched else 1.0
+
+    T = _get_transform(view.rotation)
+    print(view.direction)
 
     with vao, offscreen_buffer:
 
@@ -72,26 +74,28 @@ def render_view(window):
 
         with draw_program, drawing_texture:
 
-            gl.glUniform4fv(4, 256, colors)
+            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, (gl.GLfloat*16)(*np.asarray(T.flatten("F"))[0]))
+            gl.glUniform3f(1, *view.direction)
+            gl.glUniform4fv(5, 256, colors)
 
             # Draw the layers below the current one
-            if cursor_pos > 0:
+            if cursor_pos < d - 1:            
                 with empty_texture:
-                    gl.glUniform1f(1, other_layer_alpha)
-                    gl.glUniform2i(2, 0, cursor_pos)
+                    gl.glUniform1f(2, other_layer_alpha)
+                    gl.glUniform2i(3, cursor_pos+1, d)
                     gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
-
+                
             # Draw the current layer + overlay
             with overlay_texture:
-                gl.glUniform1f(1, 1)
-                gl.glUniform2i(2, cursor_pos, cursor_pos + 1)
+                gl.glUniform1f(2, 1)
+                gl.glUniform2i(3, cursor_pos, cursor_pos + 1)
                 gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
                 
             # Draw the layers on top
-            if cursor_pos < d - 1:
+            if cursor_pos > 0:
                 with empty_texture:
-                    gl.glUniform1f(1, other_layer_alpha)
-                    gl.glUniform2i(2, cursor_pos + 1, d)
+                    gl.glUniform1f(2, other_layer_alpha)
+                    gl.glUniform2i(3, 0, cursor_pos)
                     gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
 
     return offscreen_buffer
@@ -144,4 +148,39 @@ def _get_colors(colors):
     return (gl.GLfloat*(4*256))(*float_colors)
 
 
+def make_translation(x, y, z):
+    return np.matrix([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
+
+
+Rx90 = np.matrix([[1, 0, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, -1, 0, 0],
+                  [0, 0, 0, 1]])
+Ry90 = np.matrix([[0, 0, -1, 0],
+                  [0, 1, 0, 0],
+                  [1, 0, 0, 0],
+                  [0, 0, 0, 1]])
+Rz90 = np.matrix([[0, 1, 0, 0],
+                  [-1, 0, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]])
+
+
+@lru_cache(1)
+def _get_transform(rotation):
+    T1 = make_translation(-1 / 2, -1 / 2, -1 / 2)
+    print("T1", T1)
+    T2 = make_translation(1 / 2, 1 / 2, 1 / 2)
+    print("T2", T2)
+    R = np.matrix(np.eye(4))
+    rx, ry, rz = rotation
+    for _ in range(rz):
+        R *= Rz90        
+    for _ in range(rx):
+        R *= Rx90
+    for _ in range(ry):
+        R *= Ry90    
+    print("R", R)
+    return T2 * R * T1
+    
 

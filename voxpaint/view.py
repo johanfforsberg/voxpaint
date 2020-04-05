@@ -12,6 +12,24 @@ from .rect import Rectangle
 from .util import AutoResetting
 
 
+Rx90 = np.matrix([[1, 0, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, -1, 0, 0],
+                  [0, 0, 0, 1]])
+Ry90 = np.matrix([[0, 0, -1, 0],
+                  [0, 1, 0, 0],
+                  [1, 0, 0, 0],
+                  [0, 0, 0, 1]])
+Rz90 = np.matrix([[0, 1, 0, 0],
+                  [-1, 0, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]])
+
+
+def make_translation(x, y, z):
+    return np.matrix([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
+
+
 class DrawingView:
 
     """
@@ -145,6 +163,18 @@ class DrawingView:
         if z:
             return cz if z == 1 else d - cz - 1
 
+    @property
+    def real_layer_index(self):
+        "The depth of the current layer index as seen from the user."
+        x, y, z = self.direction
+        cx, cy, cz = self.cursor
+        if x:
+            return cx
+        if y:
+            return cy
+        if z:
+            return cz
+        
     def layer(self, index: int=None):
         index = index if index is not None else self.layer_index
         return self.data[:, :, index]
@@ -197,7 +227,10 @@ class DrawingView:
         self.move_cursor(-x, -y, -z)
         self.layer_being_switched = True
 
-    def modify_layer(self, index: int, slc2: Tuple[slice, slice], data: np.ndarray, tool):
+    def modify_layer(self, index: int, rect: Rectangle, data: np.ndarray, tool):
+        slc2 = rect.as_slice()
+        drawing_slice = self.to_drawing_slice(rect)
+        #self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
         self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
                 
     def move_layer(self, d: int):
@@ -244,6 +277,46 @@ class DrawingView:
         else:
             self.hide_layer(index)
 
+    @property
+    def transform(self):
+        return self._get_transform(self.rotation)
+
+    @lru_cache(1)
+    def _get_transform(self, rotation):
+        w1, h1, d1 = self.shape
+        T1 = make_translation(-w1 / 2, -h1 / 2, -d1 / 2)
+        print("T1", T1)
+        w2, h2, d2 = self.data.base.shape if self.data.base is not None else self.shape
+        T2 = make_translation(w2 / 2, h2 / 2, d2 / 2)
+        print("T2", T2)
+        R = np.matrix(np.eye(4))
+        rx, ry, rz = rotation
+        for _ in range(rz):
+            R *= Rz90
+        for _ in range(rx):
+            R *= Rx90
+        for _ in range(ry):
+            R *= Ry90
+        print("R", R)
+        return T2 * R * T1
+
+    def to_drawing_slice(self, rect):
+        x0, y0 = rect.topleft
+        x1, y1 = rect.bottomright
+
+        topleft = np.array([x0, y0, self.real_layer_index, 1])
+        print("direction", sum(self.direction), self.real_layer_index)
+        bottomright = np.array([x1, y1, self.real_layer_index+1, 1])
+
+        T = self.transform
+        print((T @ topleft.T).getA1())
+        xd0, yd0, zd0, _ = (T @ topleft.T).getA1()
+        xd1, yd1, zd1, _ = (T @ bottomright.T).getA1()
+
+        return (slice(*sorted([int(xd0), int(xd1)])),
+                slice(*sorted([int(yd0), int(yd1)])),
+                slice(*sorted([int(zd0), int(zd1)])))
+        
             
 class Overlay:
 
