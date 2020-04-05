@@ -70,6 +70,7 @@ class DrawingView:
         self.rotation = (pitch + dx) % 4, (yaw + dy) % 4, (roll + dz) % 4
 
     def set_cursor(self, x=None, y=None, z=None):
+        print("set_cursor", x, y, z)
         x0, y0, z0 = self.cursor
         self.cursor = (x if x is not None else x0,
                        y if y is not None else y0,
@@ -78,6 +79,7 @@ class DrawingView:
         
     def move_cursor(self, dx=0, dy=0, dz=0):
         "Move the cursor relative to current position."
+        print("move_cursor", dx, dy, dz)
         x, y, z = self.cursor
         w, h, d = self.drawing.data.shape
         self.cursor = (min(w-1, max(0, x + dx)),
@@ -164,27 +166,19 @@ class DrawingView:
     @property
     def layer_index(self):
         "The depth of the current layer index as seen from the user."
-        x, y, z = self.direction
-        d = self.data.shape[2]
-        cx, cy, cz = self.cursor
+        return self._get_layer_index(self.direction, self.data.shape, self.cursor)
+
+    @lru_cache(1)
+    def _get_layer_index(self, direction, shape, cursor):
+        x, y, z = direction
+        d = shape[2]
+        cx, cy, cz = cursor
         if x:
             return cx if x == 1 else d - cx - 1
         if y:
             return cy if y == 1 else d - cy - 1
         if z:
-            return cz if z == 1 else d - cz - 1
-
-    @property
-    def real_layer_index(self):
-        "The depth of the current layer index as seen from the user."
-        x, y, z = self.direction
-        cx, cy, cz = self.cursor
-        if x:
-            return cx
-        if y:
-            return cy
-        if z:
-            return cz
+            return cz if z == 1 else d - cz - 1        
         
     def layer(self, index: int=None):
         index = index if index is not None else self.layer_index
@@ -206,27 +200,14 @@ class DrawingView:
     def _get_overlay(self, size: Tuple[int, int]):
         return Overlay(size)
 
-    @property
-    def dirty(self):
-        "A dict of the current 'dirty' parts of each layer by index."
-        return self._get_dirty(self.rotation)
-
-    @lru_cache(1)
-    def _get_dirty(self, rot: Tuple[int, int, int]):
-        w, h, d = self.shape
-        rect = Rectangle(size=(w, h))
-        return {index: rect for index in range(d)}
-
     def modify(self, slc3: Tuple[slice, slice, slice], data, tool):
         self.drawing.modify(slc3, data, self.rotation, tool)
 
     def undo(self):
         self.drawing.undo()
-        self._get_dirty.cache_clear()
 
     def redo(self):
         self.drawing.redo()
-        self._get_dirty.cache_clear()
 
     def next_layer(self):
         x, y, z = self.direction
@@ -239,13 +220,7 @@ class DrawingView:
         self.layer_being_switched = True
 
     def modify_layer(self, index: int, rect: Rectangle, data: np.ndarray, tool):
-        #slc2 = rect.as_slice()
-        t0 = time()
         drawing_slice = self.to_drawing_slice(rect)
-        dt = time() - t0
-        print(dt)
-        #self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
-        #self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
         data = data.reshape(*data.shape, 1)
         self.drawing.modify(drawing_slice, self._unrotate_array(data, self.rotation), tool)
                 
@@ -294,11 +269,11 @@ class DrawingView:
             self.hide_layer(index)
 
     @property
-    def transform(self):
-        return self._get_transform(self.rotation)
+    def untransform(self):
+        return self._get_untransform(self.rotation)
 
     @lru_cache(1)
-    def _get_transform(self, rotation):
+    def _get_untransform(self, rotation):
         w1, h1, d1 = self.shape
         T1 = make_translation(-w1 / 2, -h1 / 2, -d1 / 2)
         print("T1", T1)
@@ -324,7 +299,7 @@ class DrawingView:
         print("direction", sum(self.direction), self.layer_index)
         bottomright = np.array([x1, y1, self.layer_index+1, 1])
 
-        T = self.transform
+        T = self.untransform
         print((T @ topleft.T).getA1())
         xd0, yd0, zd0, _ = (T @ topleft.T).getA1()
         xd1, yd1, zd1, _ = (T @ bottomright.T).getA1()

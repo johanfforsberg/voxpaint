@@ -1,5 +1,6 @@
 from functools import lru_cache
 from itertools import chain
+from time import time
 
 import numpy as np
 from pyglet import gl
@@ -21,16 +22,13 @@ def render_view(window):
 
     drawing = window.drawing
     view = window.view
-    data = drawing.data
-    w, h, d = view.shape
-    size = w, h
-    offscreen_buffer = _get_offscreen_buffer(size)
-    colors = _get_colors(drawing.palette.colors)
 
     changed = False
     
     # Update the overlay with the current stroke
     overlay = view.overlay
+    w, h, d = view.shape
+    size = w, h    
     overlay_texture = _get_overlay_texture(size)
     if overlay.dirty and overlay.lock.acquire(timeout=0.01):
         rect = overlay.dirty
@@ -45,50 +43,42 @@ def render_view(window):
         changed = True
 
     # Update the image texture
+    data = drawing.data
     drawing_texture = _get_3d_texture(data.shape)
-    # for i, dirty in list(view.dirty.items()):
-    #     if drawing.lock.acquire(timeout=0.01):
-    #         layer = data[:, :, i]
-    #         layer_data = layer.tobytes(order="F")  # TODO maybe there's a better way?
-    #         gl.glTextureSubImage3D(drawing_texture.name, 0,
-    #                                0, 0, i, w, h, 1,  # TODO use dirty rect
-    #                                gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
-    #                                layer_data)
-    #         view.dirty[i] = None
-
     if drawing.dirty:
         with drawing.lock:
             update_data = data[drawing.dirty].tobytes(order="F")
             sx, sy, sz = drawing.dirty
-            #print(drawing.dirty)
             drawing.dirty = None
-        w = sx.stop - sx.start
-        h = sy.stop - sy.start
-        d = sz.stop - sz.start
-        #print(w, h, d)
+        sw = sx.stop - sx.start
+        sh = sy.stop - sy.start
+        sd = sz.stop - sz.start
         gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for writing 8bit data        
         gl.glTextureSubImage3D(drawing_texture.name, 0,
-                               sx.start, sy.start, sz.start, w, h, d,
+                               sx.start, sy.start, sz.start, sw, sh, sd,
                                gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
                                update_data)
         gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
-
         changed = True
 
     # Render everything to the offscreen buffer
-    cursor_pos = d - view.layer_index - 1  # TODO why?
-
-    vao = _get_vao()
-    draw_program = _get_program()
-    empty_texture = _get_empty_texture(size)
-
-    other_layer_alpha = 0.3 if view.show_only_current_layer or view.layer_being_switched else 1.0
-
-    T = _get_transform(view.rotation)
 
     # TODO we actually should not have to redraw the offscreen_buffer unless something has changed
     # (e.g. drawing, overlay, palette or cursor)
 
+    offscreen_buffer = _get_offscreen_buffer(size)
+    colors = _get_colors(drawing.palette.colors)
+
+    vao = _get_vao()
+    draw_program = _get_program()
+    empty_texture = _get_empty_texture(size)    
+
+    cursor_pos = d - view.layer_index - 1  # TODO why?
+
+    other_layer_alpha = 0.3 if view.show_only_current_layer or view.layer_being_switched else 1.0
+
+    T = _get_transform(view.rotation)
+    
     with vao, offscreen_buffer:
 
         gl.glEnable(gl.GL_BLEND)
@@ -171,6 +161,8 @@ def _get_colors(colors):
                                        for r, g, b, a in colors)
     return (gl.GLfloat*(4*256))(*float_colors)
 
+
+# TODO this stuff is duplicated (almost) in view.py
 
 def make_translation(x, y, z):
     return np.matrix([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
