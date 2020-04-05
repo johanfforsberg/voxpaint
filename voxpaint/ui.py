@@ -369,7 +369,7 @@ def render_layers(view):
     if changed:
         x, y, z = view.direction
         delta = new_index - index
-        view.move_cursor(dx=x*delta, dy=y*delta, dz=z*delta)
+        view.switch_layer(delta)
         
 
 def render_menu(window):
@@ -410,6 +410,14 @@ def render_menu(window):
 
             if imgui.menu_item("Close", "", False, window.drawing)[0]:
                 window.close_drawing()
+
+            imgui.separator()
+            
+            if imgui.menu_item("Undo", "", False, window.drawing and window.drawing.undos)[0]:
+                window.drawing.undo()
+
+            if imgui.menu_item("Redo", "", False, window.drawing and window.drawing.redos)[0]:
+                window.drawing.redo()
                 
             if window.drawings:
                 imgui.separator()

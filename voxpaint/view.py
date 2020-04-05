@@ -203,22 +203,17 @@ class DrawingView:
     def modify(self, slc3: Tuple[slice, slice, slice], data, tool):
         self.drawing.modify(slc3, data, self.rotation, tool)
 
-    def undo(self):
-        self.drawing.undo()
-
-    def redo(self):
-        self.drawing.redo()
-
     def next_layer(self):
-        x, y, z = self.direction
-        self.move_cursor(x, y, z)
-        self.layer_being_switched = True
+        self.switch_layer(1)
 
     def prev_layer(self):
-        x, y, z = self.direction
-        self.move_cursor(-x, -y, -z)
-        self.layer_being_switched = True
+        self.switch_layer(-1)
 
+    def switch_layer(self, delta):
+        x, y, z = self.direction
+        self.move_cursor(delta * x, delta * y, delta * z)
+        self.layer_being_switched = True
+        
     def modify_layer(self, index: int, rect: Rectangle, data: np.ndarray, tool):
         drawing_slice = self.to_drawing_slice(rect)
         data = data.reshape(*data.shape, 1)

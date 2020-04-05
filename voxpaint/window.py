@@ -260,9 +260,9 @@ class VoxpaintWindow(pyglet.window.Window):
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
         if self.keys[key.LSHIFT]:
             if scroll_y > 0:
-                self.view.next_layer()
+                self.view.switch_layer(1)
             else:
-                self.view.prev_layer()
+                self.view.switch_layer(-1)
         else:
             ox, oy = self.offset
             ix, iy = self._to_image_coords(x, y)
@@ -287,12 +287,12 @@ class VoxpaintWindow(pyglet.window.Window):
             if modifiers & key.MOD_SHIFT:
                 self.view.move_layer(1)
             else:
-                self.view.next_layer()
+                self.view.switch_layer(1)
         elif symbol in {key.S}:
             if modifiers & key.MOD_SHIFT:
                 self.view.move_layer(-1)
             else:
-                self.view.prev_layer()
+                self.view.switch_layer(-1)
                 
         elif symbol == key.V:
             self.view.toggle_layer()
@@ -316,9 +316,9 @@ class VoxpaintWindow(pyglet.window.Window):
             self.overlay and self.overlay.clear_all()
             
         elif symbol == key.Z:
-            self.view.undo()
+            self.drawing.undo()
         elif symbol == key.Y:
-            self.view.redo()
+            self.drawing.redo()
 
         elif symbol in {key.LSHIFT, key.RSHIFT}:
             self.temp_tool = LayerPickerTool
