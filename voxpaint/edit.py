@@ -12,21 +12,19 @@ class LayerEdit(Edit):
     
     slc: tuple
     diff: bytes
-    rotation: tuple
+    #rotation: tuple
     points: list
     color: int
 
     @classmethod
-    def create(cls, drawing, slc, data, rotation, tool):
+    def create(cls, drawing, slc, data, tool):
         mask = data.astype(np.bool)
-        view = drawing.get_view(rotation)
         # TODO seems like there should be a way to do this without having to
         # re-create the view every time, but I haven't found it yet. In any case
         # it's very cheap, but we need to store the rotation.
         return cls(
             slc,
-            zlib.compress(np.subtract(data, mask * view.data[slc], dtype=np.int16).tobytes()),
-            rotation,
+            zlib.compress(np.subtract(data, mask * drawing.data[slc], dtype=np.int16).tobytes()),
             [],  # tool.points,
             tool.color
         )
@@ -36,16 +34,18 @@ class LayerEdit(Edit):
         shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start), abs(sz.stop - sz.start)]
         diff = np.frombuffer(zlib.decompress(self.diff),
                              dtype=np.int16).reshape(shape)
-        view = drawing.get_view(rotation=self.rotation)
-        view.data[slc] = np.add(view.data[slc], diff, casting="unsafe")
+        #view = drawing.get_view(rotation=self.rotation)
+        drawing.data[slc] = np.add(drawing.data[slc], diff, casting="unsafe")
+        return slc
 
     def revert(self, drawing):
         slc = sx, sy, sz = self.slc
         shape = [abs(sx.stop - sx.start), abs(sy.stop - sy.start), abs(sz.stop - sz.start)]
         diff = np.frombuffer(zlib.decompress(self.diff),
                              dtype=np.int16).reshape(shape)
-        view = drawing.get_view(rotation=self.rotation)
-        view.data[slc] = np.subtract(view.data[slc], diff, casting="unsafe")
+        # view = drawing.get_view(rotation=self.rotation)
+        drawing.data[slc] = np.subtract(drawing.data[slc], diff, casting="unsafe")
+        return slc
 
 
 @dataclass(frozen=True)

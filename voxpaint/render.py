@@ -26,6 +26,8 @@ def render_view(window):
     size = w, h
     offscreen_buffer = _get_offscreen_buffer(size)
     colors = _get_colors(drawing.palette.colors)
+
+    changed = False
     
     # Update the overlay with the current stroke
     overlay = view.overlay
@@ -34,27 +36,47 @@ def render_view(window):
         rect = overlay.dirty
         x0, y0, x1, y1 = rect.box()
         overlay_data = overlay.data[x0:x1, y0:y1].tobytes("F")
+        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for writing 8bit data                
         gl.glTextureSubImage2D(overlay_texture.name, 0, *rect.position, *rect.size,
                                gl.GL_RGBA_INTEGER, gl.GL_UNSIGNED_BYTE, overlay_data)
+        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
         overlay.dirty = None
         overlay.lock.release()
+        changed = True
 
     # Update the image texture
-    gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for writing 8bit data
     drawing_texture = _get_3d_texture(data.shape)
-    for i, dirty in list(view.dirty.items()):
-        if drawing.lock.acquire(timeout=0.01):
-            layer = data[:, :, i]
-            layer_data = layer.tobytes(order="F")  # TODO maybe there's a better way?
-            gl.glTextureSubImage3D(drawing_texture.name, 0,
-                                   0, 0, i, w, h, 1,  # TODO use dirty rect
-                                   gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
-                                   layer_data)
-            view.dirty[i] = None
-    gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
+    # for i, dirty in list(view.dirty.items()):
+    #     if drawing.lock.acquire(timeout=0.01):
+    #         layer = data[:, :, i]
+    #         layer_data = layer.tobytes(order="F")  # TODO maybe there's a better way?
+    #         gl.glTextureSubImage3D(drawing_texture.name, 0,
+    #                                0, 0, i, w, h, 1,  # TODO use dirty rect
+    #                                gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
+    #                                layer_data)
+    #         view.dirty[i] = None
+
+    if drawing.dirty:
+        with drawing.lock:
+            update_data = data[drawing.dirty].tobytes(order="F")
+            sx, sy, sz = drawing.dirty
+            #print(drawing.dirty)
+            drawing.dirty = None
+        w = sx.stop - sx.start
+        h = sy.stop - sy.start
+        d = sz.stop - sz.start
+        #print(w, h, d)
+        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)  # Needed for writing 8bit data        
+        gl.glTextureSubImage3D(drawing_texture.name, 0,
+                               sx.start, sy.start, sz.start, w, h, d,
+                               gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE,
+                               update_data)
+        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 4)
+
+        changed = True
 
     # Render everything to the offscreen buffer
-    cursor_pos = d - view.layer_index - 1
+    cursor_pos = d - view.layer_index - 1  # TODO why?
 
     vao = _get_vao()
     draw_program = _get_program()
@@ -63,7 +85,9 @@ def render_view(window):
     other_layer_alpha = 0.3 if view.show_only_current_layer or view.layer_being_switched else 1.0
 
     T = _get_transform(view.rotation)
-    print(view.direction)
+
+    # TODO we actually should not have to redraw the offscreen_buffer unless something has changed
+    # (e.g. drawing, overlay, palette or cursor)
 
     with vao, offscreen_buffer:
 
@@ -74,7 +98,7 @@ def render_view(window):
 
         with draw_program, drawing_texture:
 
-            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, (gl.GLfloat*16)(*np.asarray(T.flatten("F"))[0]))
+            gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, (gl.GLfloat*16)(*T))
             gl.glUniform3f(1, *view.direction)
             gl.glUniform4fv(5, 256, colors)
 
@@ -150,7 +174,7 @@ def _get_colors(colors):
 
 def make_translation(x, y, z):
     return np.matrix([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
-
+ 
 
 Rx90 = np.matrix([[1, 0, 0, 0],
                   [0, 0, 1, 0],
@@ -169,9 +193,7 @@ Rz90 = np.matrix([[0, 1, 0, 0],
 @lru_cache(1)
 def _get_transform(rotation):
     T1 = make_translation(-1 / 2, -1 / 2, -1 / 2)
-    print("T1", T1)
     T2 = make_translation(1 / 2, 1 / 2, 1 / 2)
-    print("T2", T2)
     R = np.matrix(np.eye(4))
     rx, ry, rz = rotation
     for _ in range(rz):
@@ -180,7 +202,7 @@ def _get_transform(rotation):
         R *= Rx90
     for _ in range(ry):
         R *= Ry90    
-    print("R", R)
-    return T2 * R * T1
+    T = T2 * R * T1
+    return np.asarray(T.flatten("F"))[0]
     
 

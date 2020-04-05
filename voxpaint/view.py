@@ -1,6 +1,7 @@
 from functools import lru_cache
 import math
 from threading import RLock
+from time import time
 from typing import Tuple, Optional
 
 from euclid3 import Vector3
@@ -112,7 +113,17 @@ class DrawingView:
             masked_data[:, :, hidden_layers] = np.ma.masked
             return masked_data
         return data
-                    
+
+    def _unrotate_array(self, a, rotation):
+        rx, ry, rz = rotation
+        if ry:
+            a = np.rot90(a, -ry, (2, 0))
+        if rx:
+            a = np.rot90(a, -rx, (1, 2))
+        if rz:
+            a = np.rot90(a, -rz, (0, 1))
+        return a
+    
     @property
     def direction(self):
         return self._get_direction(self.rotation)
@@ -228,10 +239,15 @@ class DrawingView:
         self.layer_being_switched = True
 
     def modify_layer(self, index: int, rect: Rectangle, data: np.ndarray, tool):
-        slc2 = rect.as_slice()
+        #slc2 = rect.as_slice()
+        t0 = time()
         drawing_slice = self.to_drawing_slice(rect)
+        dt = time() - t0
+        print(dt)
         #self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
-        self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
+        #self.drawing.modify((*slc2, slice(index, index+1)), data.reshape(*data.shape, 1), self.rotation, tool)
+        data = data.reshape(*data.shape, 1)
+        self.drawing.modify(drawing_slice, self._unrotate_array(data, self.rotation), tool)
                 
     def move_layer(self, d: int):
         from_index = self.layer_index
@@ -304,9 +320,9 @@ class DrawingView:
         x0, y0 = rect.topleft
         x1, y1 = rect.bottomright
 
-        topleft = np.array([x0, y0, self.real_layer_index, 1])
-        print("direction", sum(self.direction), self.real_layer_index)
-        bottomright = np.array([x1, y1, self.real_layer_index+1, 1])
+        topleft = np.array([x0, y0, self.layer_index, 1])
+        print("direction", sum(self.direction), self.layer_index)
+        bottomright = np.array([x1, y1, self.layer_index+1, 1])
 
         T = self.transform
         print((T @ topleft.T).getA1())

@@ -210,7 +210,7 @@ class VoxpaintWindow(pyglet.window.Window):
             s = tool.rect.as_slice()
             self.view.modify_layer(self.view.layer_index, tool.rect, self.view.overlay.data[s], tool)
             self.view.overlay.clear(tool.rect)
-            self.view.dirty[self.view.layer_index] = tool.rect
+            # self.view.dirty[self.view.layer_index] = tool.rect
         else:
             # If no rect is set, the tool is presumed to not have changed anything.
             self.view.overlay.clear_all()
@@ -330,6 +330,8 @@ class VoxpaintWindow(pyglet.window.Window):
             
         elif symbol == key.F4:
             init_plugins(self)
+        elif symbol == key.F5:
+            self.drawing.dirty = tuple(slice(0, c) for c in self.drawing.shape)
 
         elif symbol == key.ESCAPE:
             if self.drawing:
