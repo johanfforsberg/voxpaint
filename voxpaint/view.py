@@ -118,6 +118,7 @@ class DrawingView:
 
     def _unrotate_array(self, a, rotation):
         rx, ry, rz = rotation
+        print(a.shape)
         if ry:
             a = np.rot90(a, -ry, (2, 0))
         if rx:
@@ -224,17 +225,9 @@ class DrawingView:
         to_index = from_index + d
         depth = self.data.shape[2]
         if (from_index != to_index) and (0 <= from_index < depth) and (0 <= to_index < depth):
-            x, y, z = self.direction
-            if x:
-                slc1 = slice(from_index, from_index + 1), slice(None), slice(None)
-                slc2 = slice(to_index, to_index + 1), slice(None), slice(None)
-            elif y:
-                slc1 = slice(None), slice(from_index, from_index + 1), slice(None)
-                slc2 = slice(None), slice(to_index, to_index + 1), slice(None)
-            elif z:
-                slc1 = slice(None), slice(None), slice(from_index, from_index + 1)
-                slc2 = slice(None), slice(None), slice(to_index, to_index + 1)
-                    
+            rect = Rectangle(size=self.size)
+            slc1 = self.to_drawing_slice(rect, from_index)
+            slc2 = self.to_drawing_slice(rect, to_index)
             self.drawing.move_layer(slc1, slc2)
             deltas = [d * a for a in self.direction]
             self.move_cursor(*deltas)
@@ -291,13 +284,13 @@ class DrawingView:
         print("R", R)
         return T2 * R * T1
 
-    def to_drawing_slice(self, rect):
+    def to_drawing_slice(self, rect, index=None):
         x0, y0 = rect.topleft
         x1, y1 = rect.bottomright
 
-        topleft = np.array([x0, y0, self.layer_index, 1])
-        print("direction", sum(self.direction), self.layer_index)
-        bottomright = np.array([x1, y1, self.layer_index+1, 1])
+        index = self.layer_index if index is None else index
+        topleft = np.array([x0, y0, index, 1])
+        bottomright = np.array([x1, y1, index+1, 1])
 
         T = self.untransform
         print((T @ topleft.T).getA1())
