@@ -224,15 +224,20 @@ class DrawingView:
         to_index = from_index + d
         depth = self.data.shape[2]
         if (from_index != to_index) and (0 <= from_index < depth) and (0 <= to_index < depth):
-            self.drawing.move_layer(from_index, to_index, self.rotation)
+            x, y, z = self.direction
+            if x:
+                slc1 = slice(from_index, from_index + 1), slice(None), slice(None)
+                slc2 = slice(to_index, to_index + 1), slice(None), slice(None)
+            elif y:
+                slc1 = slice(None), slice(from_index, from_index + 1), slice(None)
+                slc2 = slice(None), slice(to_index, to_index + 1), slice(None)
+            elif z:
+                slc1 = slice(None), slice(None), slice(from_index, from_index + 1)
+                slc2 = slice(None), slice(None), slice(to_index, to_index + 1)
+                    
+            self.drawing.move_layer(slc1, slc2)
             deltas = [d * a for a in self.direction]
             self.move_cursor(*deltas)
-            self.dirty[from_index] = self.dirty[to_index] = True  # TODO make this smarter
-            if from_index in self.hidden_layers:
-                hidden = set(self.hidden_layers)
-                hidden.remove(from_index)
-                hidden.add(to_index)
-                self.hidden_layers = tuple(sorted(hidden))
 
     def make_brush(self, rect: Optional[Rectangle]=None, clear: bool=False):
         if rect:

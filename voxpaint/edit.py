@@ -2,6 +2,8 @@ from dataclasses import dataclass
 import numpy as np
 import zlib
 
+from .util import slice_union
+
 
 class Edit:
     pass
@@ -69,16 +71,13 @@ class LayerSwapEdit(Edit):
 
     "Swap places between two layers."
     
-    index1: int
-    index2: int
-    rotation: tuple
+    slc1: int
+    slc2: int
 
     def perform(self, drawing):
-        view = drawing.get_view(rotation=self.rotation)
-        layer1 = view.layer(self.index1)
-        layer2 = view.layer(self.index2).copy()
-        view.data[:, :, self.index2] = layer1
-        view.data[:, :, self.index1] = layer2
+        a, b = drawing.data[self.slc1].copy(), drawing.data[self.slc2].copy()
+        drawing.data[self.slc1], drawing.data[self.slc2] = b, a
+        return slice_union(self.slc1, self.slc2, drawing.data.shape)
 
     revert = perform  # This is a symmetric operation
 

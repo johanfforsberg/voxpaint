@@ -11,35 +11,12 @@ from .edit import LayerEdit, PaletteEdit, LayerSwapEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
-from .util import Selectable
+from .util import Selectable, slice_union
 from .view import DrawingView
 
 
 Shape = Tuple[int, int, int]
         
-
-def slice_union(slice1, slice2, shape):
-
-    if slice1 is None:
-        return slice2
-
-    if slice2 is None:
-        return slice1
-    
-    w, h, d = shape
-
-    x10, x11, _ = slice1.indices(w)
-    y10, y11, _ = slice1.indices(h)
-    z10, z11, _ = slice1.indices(d)
-
-    x20, x21, _ = slice2.indices(w)
-    y20, y21, _ = slice2.indices(h)
-    z20, z21, _ = slice2.indices(d)
-
-    return (slice(min(x10, x20), max(x11, x21)),
-            slice(min(y10, y20), max(y11, y21)),
-            slice(min(z10, z20), max(z11, z21)))
-
 
 class Drawing:
 
@@ -162,8 +139,8 @@ class Drawing:
         edit.perform(self)
         self.version += 1
 
-    def move_layer(self, from_index, to_index, rotation):
-        edit = LayerSwapEdit(from_index, to_index, rotation)
+    def move_layer(self, from_slice, to_slice):
+        edit = LayerSwapEdit(from_slice, to_slice)
         with self.lock:
             slc = edit.perform(self)
         self.dirty = slice_union(slc, self.dirty, self.data.shape)
