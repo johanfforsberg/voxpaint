@@ -62,10 +62,9 @@ class VoxpaintWindow(pyglet.window.Window):
                                     FragmentShader("glsl/triangle_frag.glsl"))
         
         if path:
-            self.drawings = Selectable([Drawing.from_ora(path)])
+            self.drawings = Selectable([Drawing.from_ora(path)], on_change=lambda d: d.all_dirty())
         else:
-            # self.drawing = Drawing((640, 480, 10), palette=Palette())
-            self.drawings = Selectable()
+            self.drawings = Selectable(on_change=lambda d: d.all_dirty())
         self.exit_unsaved_drawings = None
         self.close_unsaved_drawing = None
         self._views = {}

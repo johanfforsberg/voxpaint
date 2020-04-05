@@ -26,10 +26,11 @@ class Selectable:
     Also supports adding and removing items.
     """
 
-    def __init__(self, items=None, maxitems=None):
+    def __init__(self, items=None, maxitems=None, on_change=None):
         self.items = items or []
-        self.current = items[0] if items else None
+        self._current = items[0] if items else None
         self.maxitems = maxitems
+        self.on_change = on_change
 
     def __iter__(self):
         return iter(self.items)
@@ -46,15 +47,25 @@ class Selectable:
     def __setitem__(self, index, item):
         self.set_item(item, index)
 
+    @property
+    def current(self):
+        return self._current
+
+    @current.setter
+    def current(self, item):
+        if item is None:
+            self._current = None
+        else:
+            assert item in self.items, f"No such item {item}!"
+            self._current = item        
+        if self.on_change:
+            self.on_change(item)
+        
     def index(self, item=None):
         return self.items.index(item or self.current)
 
     def select(self, item):
-        if item is None:
-            self.current = None
-        else:
-            assert item in self.items, f"No such item {item}!"
-            self.current = item
+        self.current = item
 
     def set_item(self, item, index=None):
         current_index = self.get_current_index()

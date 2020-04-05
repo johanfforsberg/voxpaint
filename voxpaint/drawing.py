@@ -71,8 +71,12 @@ class Drawing:
 
         self.last_saved_version = self.version = 0
 
-        self.dirty = tuple(slice(0, c) for c in self.shape)
+        self.dirty = None
+        self.all_dirty()
 
+    def all_dirty(self):
+        self.dirty = tuple(slice(0, c) for c in self.shape)        
+        
     @property
     def size(self):
         return self.data.shape[:2]
