@@ -468,10 +468,14 @@ def render_menu(window):
             if imgui.menu_item("Move layer down", "S", False, window.view.layer_index > 0)[0]:
                 window.view.move_layer(-1)
 
-            imgui.separator()
+            if imgui.menu_item("Delete layer", "", False, True)[0]:
+                window.view.delete_layer()
 
-            if imgui.menu_item("Visibility", "V", window.view.layer_visible, True)[0]:
-                window.view.toggle_layer()
+            if imgui.menu_item("Insert layer", "", False, True)[0]:
+                window.view.insert_layer()
+
+            if imgui.menu_item("Duplicate layer", "", False, True)[0]:
+                window.view.duplicate_layer()
                 
             imgui.end_menu()
 

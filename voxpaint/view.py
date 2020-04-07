@@ -56,11 +56,6 @@ class DrawingView:
 
         self.offset = (0, 0)
         self.zoom = 2
-
-        # This might be a bit confusing, but currently the visibility of layers
-        # is tied to a specific view. I think it would be even more confusing
-        # to do it any other way though...
-        self.hidden_layers: Tuple[int, ...] = ()  # Note that this must be a tuple due to caching
         
         self.show_only_current_layer = False
 
@@ -85,18 +80,13 @@ class DrawingView:
         self.cursor = (min(w-1, max(0, x + dx)),
                        min(h-1, max(0, y + dy)),
                        min(d-1, max(0, z + dz)))
-
-    @property
-    def layer_visible(self, index=None):
-        index = self.layer_index if index is None else index
-        return index not in self.hidden_layers
         
     @property
     def data(self):
-        return self._get_data(self.rotation, self.hidden_layers)
+        return self._get_data(self.drawing.data.shape, self.rotation)
 
     @lru_cache(1)
-    def _get_data(self, rotation: Tuple[int, int, int], hidden_layers=Tuple[int]):
+    def _get_data(self, shape: Tuple[int, int, int], rotation: Tuple[int, int, int]):
         " Return a ndarray view on the drawing data, rotated properly. "
         data = self.drawing.data
         rx, ry, rz = rotation
@@ -110,10 +100,6 @@ class DrawingView:
             data = np.rot90(data, ry, (2, 0))
         # Layer visibility is implemented using a masked array. This makes it
         # pretty much transparent (ho ho) to the rest of the application.
-        if hidden_layers:
-            masked_data = np.ma.masked_array(data, fill_value=0)
-            masked_data[:, :, hidden_layers] = np.ma.masked
-            return masked_data
         return data
 
     def _unrotate_array(self, a, rotation):
@@ -232,6 +218,21 @@ class DrawingView:
             deltas = [d * a for a in self.direction]
             self.move_cursor(*deltas)
 
+    def delete_layer(self, index=None, axis=0):
+        index = self.layer_index if index is None else index
+        axis = [abs(d) for d in self.direction].index(1)  # TODO this is stupid
+        self.drawing.delete_layers(index, axis, 1)
+
+    def insert_layer(self, index=None, axis=0):
+        index = self.layer_index if index is None else index
+        axis = [abs(d) for d in self.direction].index(1)  # TODO this is stupid
+        self.drawing.insert_layers(index, axis, 1)
+
+    def duplicate_layer(self, index=None, axis=0):
+        index = self.layer_index if index is None else index
+        axis = [abs(d) for d in self.direction].index(1)  # TODO this is stupid
+        self.drawing.duplicate_layer(index, axis)
+        
     def make_brush(self, rect: Optional[Rectangle]=None, clear: bool=False):
         if rect:
             data = self.layer()[rect.as_slice()].copy()
@@ -239,27 +240,6 @@ class DrawingView:
             data = self.layer().copy()
         brush = ImageBrush(data=data)
         self.drawing.brushes.append(brush)
-
-    def hide_layer(self, index=None):
-        index = self.layer_index if index is None else index
-        hidden = set(self.hidden_layers)
-        hidden.add(index)
-        self.dirty[index] = True
-        self.hidden_layers = tuple(sorted(hidden))
-
-    def show_layer(self, index=None):
-        index = self.layer_index if index is None else index
-        hidden = set(self.hidden_layers)
-        hidden.remove(index)
-        self.dirty[index] = True
-        self.hidden_layers = tuple(sorted(hidden))
-
-    def toggle_layer(self, index=None):
-        index = self.layer_index if index is None else index
-        if index in self.hidden_layers:
-            self.show_layer(index)
-        else:
-            self.hide_layer(index)
 
     @property
     def untransform(self):

@@ -133,12 +133,7 @@ class VoxpaintWindow(pyglet.window.Window):
     def view(self):
         if not self.drawing:
             return
-        view = self._views.get(self.drawing)
-        if view:
-            return view
-        view = self.drawing.get_view()
-        self._views[self.drawing] = view
-        return view
+        return self.drawing.view
 
     @property
     def tool(self):

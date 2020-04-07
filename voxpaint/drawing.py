@@ -7,7 +7,7 @@ from uuid import uuid4
 import numpy as np
 import png
 
-from .edit import LayerEdit, PaletteEdit, LayerSwapEdit
+from .edit import LayerEdit, PaletteEdit, LayerSwapEdit, LayersDeleteEdit, LayersInsertEdit
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
@@ -50,6 +50,7 @@ class Drawing:
 
         self.dirty = None
         self.all_dirty()
+        self.view = DrawingView(self)
 
     def all_dirty(self):
         self.dirty = tuple(slice(0, c) for c in self.shape)        
@@ -122,31 +123,41 @@ class Drawing:
     @property
     def layers(self):
         return [self.data[:, :, i] for i in range(self.data.shape[2])]
-        
-    def modify(self, slc, data, tool):
-        edit = LayerEdit.create(self, slc, data, tool)
+
+    def _perform_edit(self, edit):
         with self.lock:
             slc = edit.perform(self)
         self.dirty = slice_union(slc, self.dirty, self.data.shape)
         self.version += 1
         self.undos.append(edit)
-        self.redos.clear()
+        self.redos.clear()        
+    
+    def modify(self, slc, data, tool):
+        edit = LayerEdit.create(self, slc, data, tool)
+        self._perform_edit(edit)
 
     def change_colors(self, start_i, *colors):
         orig_colors = self.palette._colors[start_i:start_i+len(colors)]
         edit = PaletteEdit(start_i, orig_colors, colors)
-        self.undos.append(edit)
-        edit.perform(self)
-        self.version += 1
+        self._perform_edit(edit)
 
     def move_layer(self, from_slice, to_slice):
         edit = LayerSwapEdit(from_slice, to_slice)
-        with self.lock:
-            slc = edit.perform(self)
-        self.dirty = slice_union(slc, self.dirty, self.data.shape)
-        self.version += 1
-        self.undos.append(edit)
-        self.redos.clear()
+        self._perform_edit(edit)
+        
+    def delete_layers(self, index, axis, n):
+        edit = LayersDeleteEdit.create(self, index, axis, n)
+        self._perform_edit(edit)
+
+    def insert_layers(self, index, axis, n):
+        shape = list(self.shape)
+        shape[axis] = 1
+        edit = LayersInsertEdit.create(np.zeros(shape, dtype=np.uint8), index, axis, n)
+        self._perform_edit(edit)
+
+    def duplicate_layer(self, index, axis):
+        edit = LayersInsertEdit.create(np.take(self.data, index, axis), index, axis, 1)
+        self._perform_edit(edit)
         
     def undo(self):
         try:
