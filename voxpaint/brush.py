@@ -19,15 +19,15 @@ class Brush:
             
     @lru_cache(2)
     def get_draw_data(self, color):
-        #rgba_color = color + 
         return np.clip(self.data, 0, 1) * color + 255 * 2**24
 
 
 class ImageBrush(Brush):
 
     @lru_cache(2)    
-    def get_draw_data(self, color=None):
+    def get_draw_data(self, color):
         filled = np.clip(self.data, 0, 1)
+        # TODO Fix this to be able to "erase" with other background colors than 0
         if color > 0:
             color = 1
         return (self.data * color + filled * 2**24).astype(np.uint32)
