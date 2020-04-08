@@ -28,7 +28,7 @@ class Drawing:
     """
 
     def __init__(self, size: Optional[Shape]=None, data: Optional[np.ndarray]=None, palette: Palette=None,
-                 path: str=None):
+                 path: str=None, hidden_layers=None):
         if data is not None:
             self._data = data
         elif size:
@@ -48,7 +48,7 @@ class Drawing:
         # is used from outside. Keep in mind that the hidden layers must be kept up to date
         # if layers are added/removed/swapped or other operations are made that change
         # the index of existing layers. Annoying but not really complicated.
-        self.hidden_layers_by_axis = ((), (), ())
+        self.hidden_layers_by_axis = tuple(tuple(l) for l in hidden_layers) if hidden_layers else ((), (), ())
 
         self.undos = []
         self.redos = []
@@ -139,13 +139,14 @@ class Drawing:
     
     @classmethod
     def from_ora(cls, path):
-        data, info, _ = load_ora(path)
-        return cls(data=data, palette=Palette(info["palette"]), path=path)
+        data, info, kwargs = load_ora(path)
+        print(kwargs)
+        return cls(data=data, palette=Palette(info["palette"]), path=path, **kwargs)
     
     def to_ora(self, path):
         view = self.get_view()
         layers = list(view.layers)
-        save_ora(self.size, layers, self.palette, path)
+        save_ora(self.size, layers, self.palette, path, hidden_layers=self.hidden_layers_by_axis)
 
     def save(self, path=None, auto=False):
         "Save the drawing to a file, in the appropriate format inferred from the filename."
@@ -288,8 +289,8 @@ class Drawing:
         else:
             self.show_layer(index, axis)
         
-    # def get_view(self, rotation=(0, 0, 0)):
-    #     return DrawingView(self, rotation)
+    def get_view(self, rotation=(0, 0, 0)):
+        return DrawingView(self, rotation)
     
     def __hash__(self):
         return hash((id(self), self.shape))
