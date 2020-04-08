@@ -282,18 +282,14 @@ class LayerPickerTool(Tool):
 
     def _set_layer(self, view, point):
         # Find the layer under the cursor
-        for i, layer in enumerate(reversed(list(view.layers))):
+        layers = list(view.layers)
+        for i, layer in enumerate(reversed(layers)):
             color = layer[point]
             if color != 0:
                 break
         else:
+            # Clicked empty part, don't set cursor
             return
-        # TODO too tired to figure this out properly, do that :)
-        rx, ry, rz = view.direction
-        sign = sum(view.direction)
-        d = view.shape[2]
-        if sign > 0:
-            view.set_cursor(d - (rx*i) - 1, d - (ry*i) - 1, d - (rz*i) - 1)
-        else:
-            view.set_cursor(-(rx*i), -(ry*i), -(rz*i))
-                
+        d = len(layers)
+        p = view.to_drawing_coord(*point, d - i - 1)
+        view.set_cursor(*(None if i != view.axis else a for i, a in enumerate(p)))

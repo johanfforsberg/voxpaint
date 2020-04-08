@@ -35,16 +35,14 @@ class DrawingView:
 
     """
     A particular "view" of a drawing. Most access to a drawing should be through
-    a view.
+    a view, since that's how the user will see it.
     
     The view holds most of the application state related to a drawing, like
-    zoom and pan offset, as well as layer visibility.
-
-    It can also apply transformations to the drawing. As of now only 90 degree
-    rotations are supported. 
+    zoom and pan offset. It can also apply transformations to the drawing.
+    As of now only 90 degree rotations are supported. 
     
     A "layer" is only meaningful in the context of a given view, and refers to
-    slices of the drawing perpendicular to the current "z" direction. 
+    slices of the drawing perpendicular to the current "depth" direction. 
     """
 
     layer_being_switched = AutoResetting(False)
@@ -266,6 +264,7 @@ class DrawingView:
 
     @property
     def untransform(self):
+        "This transform should take us from the view's space to the drawing's space."
         return self._get_untransform(self.rotation)
 
     @lru_cache(1)
@@ -286,6 +285,10 @@ class DrawingView:
 
     def to_drawing_slice(self, rect, index=None):
 
+        "Take a rect in the view's space and return a slice into the drawing data."
+
+        # TODO I don't like this mess of 2d rects and 3d slices, clean it up.
+        
         x0, y0 = rect.topleft
         x1, y1 = rect.bottomright
 
@@ -300,7 +303,11 @@ class DrawingView:
         return (slice(*sorted([int(xd0), int(xd1)])),
                 slice(*sorted([int(yd0), int(yd1)])),
                 slice(*sorted([int(zd0), int(zd1)])))
-        
+
+    def to_drawing_coord(self, x, y, z):
+        "Return the given view point in drawing space."
+        return [int(x) for x in (self.untransform @ (x, y, z, 1)).getA1()][:3]
+    
             
 class Overlay:
 
