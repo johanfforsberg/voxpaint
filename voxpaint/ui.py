@@ -460,6 +460,9 @@ def render_menu(window):
             if imgui.menu_item("Previous layer", "s", False, window.view.layer_index > 0)[0]:
                 window.view.prev_layer()
 
+            if imgui.menu_item("Toggle layer visibility", "", False, True)[0]:
+                window.view.toggle_layer()
+                
             imgui.separator()
             
             if imgui.menu_item("Move layer up", "W", False, window.view.layer_index < window.view.depth - 1)[0]:

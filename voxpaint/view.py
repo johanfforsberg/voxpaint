@@ -104,7 +104,6 @@ class DrawingView:
 
     def _unrotate_array(self, a, rotation):
         rx, ry, rz = rotation
-        print(a.shape)
         if ry:
             a = np.rot90(a, -ry, (2, 0))
         if rx:
@@ -211,27 +210,51 @@ class DrawingView:
         to_index = from_index + d
         depth = self.data.shape[2]
         if (from_index != to_index) and (0 <= from_index < depth) and (0 <= to_index < depth):
-            rect = Rectangle(size=self.size)
-            slc1 = self.to_drawing_slice(rect, from_index)
-            slc2 = self.to_drawing_slice(rect, to_index)
-            self.drawing.move_layer(slc1, slc2)
+            # rect = Rectangle(size=self.size)
+            # slc1 = self.to_drawing_slice(rect, from_index)
+            # slc2 = self.to_drawing_slice(rect, to_index)
+            self.drawing.move_layer(from_index, to_index, self.axis)
             deltas = [d * a for a in self.direction]
             self.move_cursor(*deltas)
 
-    def delete_layer(self, index=None, axis=0):
+    @property
+    def axis(self):
+        return self._get_axis(self.direction)
+    
+    @lru_cache(1)
+    def _get_axis(self, direction):
+        return [abs(d) for d in direction].index(1)  # TODO this is stupid
+            
+    def delete_layer(self, index=None):
         index = self.layer_index if index is None else index
-        axis = [abs(d) for d in self.direction].index(1)  # TODO this is stupid
-        self.drawing.delete_layers(index, axis, 1)
+        
+        self.drawing.delete_layers(index, self.axis, 1)
 
-    def insert_layer(self, index=None, axis=0):
+    def insert_layer(self, index=None):
         index = self.layer_index if index is None else index
-        axis = [abs(d) for d in self.direction].index(1)  # TODO this is stupid
-        self.drawing.insert_layers(index, axis, 1)
+        self.drawing.insert_layers(index, self.axis, 1)
 
-    def duplicate_layer(self, index=None, axis=0):
+    def duplicate_layer(self, index=None):
         index = self.layer_index if index is None else index
-        axis = [abs(d) for d in self.direction].index(1)  # TODO this is stupid
-        self.drawing.duplicate_layer(index, axis)
+        self.drawing.duplicate_layer(index, self.axis)
+
+    def hide_layer(self, index=None):
+        index = self.layer_index if index is None else index
+        self.drawing.hide_layer(index, self.axis)
+
+    def show_layer(self, index=None):
+        index = self.layer_index if index is None else index
+        self.drawing.show_layer(index, self.axis)
+
+    def layer_visible(self, index=None):
+        return self.drawing.layer_visible(index, self.axis)
+        
+    def toggle_layer(self, index=None):
+        index = self.layer_index if index is None else index
+        if self.layer_visible(index):
+            self.hide_layer(index)
+        else:
+            self.show_layer(index)
         
     def make_brush(self, rect: Optional[Rectangle]=None, clear: bool=False):
         if rect:
@@ -249,10 +272,8 @@ class DrawingView:
     def _get_untransform(self, rotation):
         w1, h1, d1 = self.shape
         T1 = make_translation(-w1 / 2, -h1 / 2, -d1 / 2)
-        print("T1", T1)
-        w2, h2, d2 = self.data.base.shape if self.data.base is not None else self.shape
+        w2, h2, d2 = self.drawing.data.shape
         T2 = make_translation(w2 / 2, h2 / 2, d2 / 2)
-        print("T2", T2)
         R = np.matrix(np.eye(4))
         rx, ry, rz = rotation
         for _ in range(rz):
@@ -261,10 +282,10 @@ class DrawingView:
             R *= Rx90
         for _ in range(ry):
             R *= Ry90
-        print("R", R)
         return T2 * R * T1
 
     def to_drawing_slice(self, rect, index=None):
+
         x0, y0 = rect.topleft
         x1, y1 = rect.bottomright
 
@@ -273,7 +294,6 @@ class DrawingView:
         bottomright = np.array([x1, y1, index+1, 1])
 
         T = self.untransform
-        print((T @ topleft.T).getA1())
         xd0, yd0, zd0, _ = (T @ topleft.T).getA1()
         xd1, yd1, zd1, _ = (T @ bottomright.T).getA1()
 

@@ -19,10 +19,13 @@ class LayerEdit(Edit):
 
     @classmethod
     def create(cls, drawing, slc, data, tool):
+        print(slc, data)
         mask = data.astype(np.bool)
+        diff = np.subtract(data, mask * drawing.data[slc], dtype=np.int16)
+        print("diff", diff)
         return cls(
             slc,
-            zlib.compress(np.subtract(data, mask * drawing.data[slc], dtype=np.int16).tobytes()),
+            zlib.compress(diff.tobytes()),
             [],  # tool.points,
             tool.color
         )
@@ -67,14 +70,14 @@ class LayerSwapEdit(Edit):
 
     "Swap places between two layers."
     
-    slc1: int
-    slc2: int
+    index1: int
+    index2: int
+    axis: int
 
     def perform(self, drawing):
-        a, b = drawing.data[self.slc1].copy(), drawing.data[self.slc2].copy()
-        drawing.data[self.slc1], drawing.data[self.slc2] = b, a
-        return slice_union(self.slc1, self.slc2, drawing.data.shape)
-
+        drawing._really_swap_layers(self.index1, self.index2, self.axis)
+        return drawing.full_slice  # TODO not necessary to report whole drawing as dirty
+        
     revert = perform  # This is a symmetric operation
 
 
@@ -97,15 +100,12 @@ class LayersDeleteEdit(Edit):
         )
 
     def perform(self, drawing):
-        drawing.data = np.delete(drawing.data, self.index, self.axis)
+        drawing._really_remove_layers(self.index, self.axis, self.n)
         return tuple(slice(0, c) for c in drawing.shape) 
     
     def revert(self, drawing):
-        shape = list(drawing.data.shape)
-        shape[self.axis] = self.n
-        data = np.frombuffer(zlib.decompress(self.data), dtype=np.uint8).reshape(shape)
-        np.set_printoptions(threshold=100000)
-        drawing.data = np.insert(drawing.data, [self.index], data, self.axis)
+        data = np.frombuffer(zlib.decompress(self.data), dtype=np.uint8)
+        drawing._really_insert_layers(data, self.index, self.axis, self.n)
         return tuple(slice(0, c) for c in drawing.shape) 
 
 
