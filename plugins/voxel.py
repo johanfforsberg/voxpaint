@@ -192,7 +192,7 @@ class Plugin:
         return r/255, g/255, b/255, a/255
 
     @lru_cache(1)
-    def _get_mesh(self, drawing, version):
+    def _get_mesh(self, drawing, version, hidden_layers):
         nz = drawing.data.nonzero()
         pixels = np.transpose(nz)
         values = drawing.data[nz]
@@ -216,7 +216,7 @@ class Plugin:
                  altitude: float=120, azimuth: float=45, spin: bool=False):
 
         size = drawing.size
-        depth = len(drawing.layers)
+        depth = drawing.shape[2]
         colors = drawing.palette.colors
 
         x = math.sin(math.pi/3)
@@ -224,7 +224,7 @@ class Plugin:
         altitude = math.radians(altitude)
         azimuth = math.radians(azimuth)
         
-        mesh = self._get_mesh(drawing, drawing.version)
+        mesh = self._get_mesh(drawing, drawing.version, drawing.hidden_layers_by_axis)
         if not mesh:
             # TODO hacky
             self.texture and self.texture[0].clear()
