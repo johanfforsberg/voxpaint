@@ -59,6 +59,9 @@ class Drawing:
         self.last_saved_version = self.version = 0
 
         self.lock = RLock()
+
+        # This is only for use by the render module, to know when it needs to update
+        # the textures and whatnot. It will be reset
         self.dirty = None
         self.all_dirty()
 
@@ -170,12 +173,13 @@ class Drawing:
     #     return [self.data[:, :, i] for i in range(self.data.shape[2])]
 
     def _perform_edit(self, edit):
+        assert self.version == edit.version, "Drawing version does not match edit. This is a bug."
         with self.lock:
             slc = edit.perform(self)
         self.dirty = slice_union(slc, self.dirty, self.shape)
         self.version += 1
         self.undos.append(edit)
-        self.redos.clear()        
+        self.redos.clear()
     
     def modify(self, slc, data, tool):
         edit = LayerEdit.create(self, slc, data, tool)
@@ -183,11 +187,11 @@ class Drawing:
 
     def change_colors(self, start_i, *colors):
         orig_colors = self.palette._colors[start_i:start_i+len(colors)]
-        edit = PaletteEdit(start_i, orig_colors, colors)
+        edit = PaletteEdit.create(self, start_i, orig_colors, colors)
         self._perform_edit(edit)
 
     def move_layer(self, from_index, to_index, axis):
-        edit = LayerSwapEdit(from_index, to_index, axis)
+        edit = LayerSwapEdit.create(self, from_index, to_index, axis)
         self._perform_edit(edit)
 
     def _get_layer_slice(self, index, axis):
@@ -250,20 +254,22 @@ class Drawing:
     def undo(self):
         try:
             edit = self.undos.pop()
-            self.redos.append(edit)
+            assert self.version == edit.version + 1, "Drawing version does not match edit. This is a bug."
             with self.lock:
                 slc = edit.revert(self)
+            self.redos.append(edit)
             self.dirty = slice_union(slc, self.dirty, self.shape)
-            self.version += 1
+            self.version = edit.version
         except IndexError:
             pass
 
     def redo(self):
         try:
             edit = self.redos.pop()
-            self.undos.append(edit)
+            assert self.version == edit.version, "Drawing version does not match edit. This is a bug."
             with self.lock:
                 slc = edit.perform(self)
+            self.undos.append(edit)
             self.dirty = slice_union(slc, self.dirty, self.shape)
             self.version += 1
         except IndexError:

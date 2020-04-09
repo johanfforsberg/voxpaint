@@ -6,28 +6,35 @@ from .util import slice_union
 
 
 class Edit:
-    pass
+
+    @classmethod
+    def create(cls, drawing, *args, **kwargs):
+        return cls(
+            *args, 
+            version=drawing.version,
+            **kwargs
+        )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True)    
 class LayerEdit(Edit):
     
     slc: tuple
     diff: bytes
     points: list
     color: int
+    version: int
 
     @classmethod
     def create(cls, drawing, slc, data, tool):
-        print(slc, data)
         mask = data.astype(np.bool)
         diff = np.subtract(data, mask * drawing.data[slc], dtype=np.int16)
-        print("diff", diff)
         return cls(
             slc,
             zlib.compress(diff.tobytes()),
             [],  # tool.points,
-            tool.color
+            tool.color,
+            drawing.version
         )
 
     def perform(self, drawing):
@@ -55,6 +62,7 @@ class PaletteEdit(Edit):
     start_index: int
     orig_data: tuple
     data: tuple
+    version: int
 
     def perform(self, drawing):
         drawing.palette.set_colors(self.start_index, self.data)
@@ -73,6 +81,7 @@ class LayerSwapEdit(Edit):
     index1: int
     index2: int
     axis: int
+    version: int
 
     def perform(self, drawing):
         drawing._really_swap_layers(self.index1, self.index2, self.axis)
@@ -88,6 +97,7 @@ class LayersDeleteEdit(Edit):
     axis: int
     n: int
     data: bytes
+    version: int
 
     @classmethod
     def create(cls, drawing, index, axis, n):
@@ -97,6 +107,7 @@ class LayersDeleteEdit(Edit):
             axis,
             n,
             zlib.compress(data.tobytes()),
+            drawing.version
         )
 
     def perform(self, drawing):
@@ -116,6 +127,7 @@ class LayersInsertEdit(Edit):
     axis: int
     n: int
     data: bytes
+    version: int
     
     @classmethod
     def create(cls, data, index, axis, n):
