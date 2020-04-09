@@ -1,7 +1,8 @@
 """
 Utilities for working with OpenRaster files, as specified by https://www.openraster.org/
 ORA is a simple, open format that can be loaded by some other graphics software,
-e.g. Krita.
+e.g. Krita. Don't expect the opposite to be true in general though, as we have very
+specific requirements.
 """
 
 from typing import List, Tuple
@@ -48,7 +49,7 @@ def save_ora(size: Tuple[int, int], layers: List[np.ndarray], palette, path, **k
 
 def load_ora(path):
     # TODO we should not allow loading arbitrary ORA, only those
-    # conforming to what oldpaint can handle.
+    # conforming to what oldpaint can handle (basically, only files saved by it...)
     with zipfile.ZipFile(path, mode="r") as orafile:
         stack_xml = orafile.read("stack.xml")
         image_el = ET.fromstring(stack_xml)
@@ -62,6 +63,7 @@ def load_ora(path):
                 image_2d = np.vstack(list(map(np.uint8, image_data))).T
                 layers.append(image_2d)
         try:
+            # TODO Should verify that this data actually makes sense, maybe using a schema?
             other_data = json.loads(orafile.read("oldpaint.json"))
         except KeyError:
             other_data = {}
