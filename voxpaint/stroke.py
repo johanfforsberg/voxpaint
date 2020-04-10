@@ -41,6 +41,7 @@ def make_stroke(view, event_queue, tool):
         # Now use the tool appropriately
         if event_type == "mouse_drag":
             if args == prev_args:
+                # Mouse has not moved to a different pixel, nothing to do
                 continue
             if tool.ephemeral and tool.rect:
                 # Grabbing the lock to prevent flickering

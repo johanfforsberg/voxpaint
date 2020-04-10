@@ -41,14 +41,19 @@ class Drawing:
         self.path = path
         self.uuid = str(uuid4())
 
-        # "layers" don't really exist, but are just "slices" in a 3d array, depending
-        # on which direction is currently viewed. We therefore need a way
-        # to keep track of which ones are set as "hidden" by the user. This info is then
-        # used to produce a masked version of the array, which is the data that actually
-        # is used from outside. Keep in mind that the hidden layers must be kept up to date
-        # if layers are added/removed/swapped or other operations are made that change
-        # the index of existing layers. Annoying but not really complicated.
-        self.hidden_layers_by_axis = tuple(tuple(l) for l in hidden_layers) if hidden_layers else ((), (), ())
+        # "layers" aren't separate things, but really just "slices" in
+        # a 3d array, depending on which direction is currently
+        # viewed. We therefore need a way to keep track of which ones
+        # are set as "hidden" by the user. This info is then used to
+        # produce a masked version of the array, which is the data
+        # that actually is used from outside. Keep in mind that the
+        # hidden layers must be kept up to date if layers are
+        # added/removed/swapped or other operations are made that
+        # change the index of existing layers. Annoying but not really
+        # complicated.
+        self.hidden_layers_by_axis = (tuple(tuple(l) for l in hidden_layers)
+                                      if hidden_layers
+                                      else ((), (), ()))
 
         self.undos = []
         self.redos = []
@@ -61,7 +66,8 @@ class Drawing:
         self.lock = RLock()
 
         # This is only for use by the render module, to know when it needs to update
-        # the textures and whatnot. It will be reset
+        # textures and stuff. It will be reset once that is done, so it can't
+        # be relied upon by anyone else.
         self.dirty = None
         self.all_dirty()
 
@@ -154,7 +160,8 @@ class Drawing:
     def save(self, path=None, auto=False):
         "Save the drawing to a file, in the appropriate format inferred from the filename."
         path = path or self.path
-        assert path, "Can't save drawing; no path given."
+        if not path:
+            raise ValueError("Can't save drawing; no path given.")
         _, ext = os.path.splitext(path)
         if ext == ".ora":
             self.to_ora(path)
@@ -167,10 +174,6 @@ class Drawing:
     @property
     def unsaved(self):
         return self.last_saved_version < self.version
-
-    # @property
-    # def layers(self):
-    #     return [self.data[:, :, i] for i in range(self.data.shape[2])]
 
     def _perform_edit(self, edit):
         assert self.version == edit.version, "Drawing version does not match edit. This is a bug."
@@ -216,7 +219,9 @@ class Drawing:
         self._update_hidden_layers(axis, hidden_layers)
         
     def insert_layers(self, index, axis, n):
-        # TODO need to be able to also add layers at the top.
+        # TODO It's probably more expected that the layer be added on top of the current
+        # layer instead of under it as is now the case. But we also need a way to add a layer
+        # at the bottom in that case.
         shape = list(self.shape)
         shape[axis] = n       
         edit = LayersInsertEdit.create(np.zeros(shape, dtype=np.uint8), index, axis, n)
@@ -261,6 +266,7 @@ class Drawing:
             self.dirty = slice_union(slc, self.dirty, self.shape)
             self.version = edit.version
         except IndexError:
+            # No edits to undo.
             pass
 
     def redo(self):
@@ -273,6 +279,7 @@ class Drawing:
             self.dirty = slice_union(slc, self.dirty, self.shape)
             self.version += 1
         except IndexError:
+            # No edits to redo.
             pass
 
     def hide_layer(self, index, axis):

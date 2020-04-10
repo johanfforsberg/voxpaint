@@ -326,9 +326,11 @@ class Overlay:
         self.data = np.zeros(size, dtype=np.uint32)
 
         self.lock = RLock()  # It is very important to grab this lock around all data changes!
+                             # Drawing is done in a thread and can otherwise collide with the main thread.
         self.rect = Rectangle((0, 0), size)
         
-        self.dirty = None
+        self.dirty = None  # After an edit, set this to the covering rect. This informs the renderer
+                           # that it should update its textures.
 
     def clear_all(self):
         self.clear(self.rect)
