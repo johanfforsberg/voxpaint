@@ -236,6 +236,10 @@ class DrawingView:
         index = self.layer_index if index is None else index
         self.drawing.duplicate_layer(index, self.axis)
 
+    @property
+    def hidden_layers(self):
+        return self.drawing.hidden_layers_by_axis[self.axis]
+        
     def hide_layer(self, index=None):
         index = self.layer_index if index is None else index
         self.drawing.hide_layer(index, self.axis)

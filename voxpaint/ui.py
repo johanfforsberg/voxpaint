@@ -361,16 +361,29 @@ def render_layers(view):
 
     "Layer selector. Currently extremely spare."
 
-    layers = list(view.layers)
-    n_layers = len(layers)
     index = view.layer_index
-    changed, new_index = imgui.v_slider_int("##layer_index", 30, 100, index,
-                                            min_value=0, max_value=n_layers - 1)
-    if changed:
-        x, y, z = view.direction
-        delta = new_index - index
-        view.switch_layer(delta)
-        
+    # changed, new_index = imgui.v_slider_int("##layer_index", 30, 100, index,
+    #                                         min_value=0, max_value=n_layers - 1)
+    # if changed:
+    #     x, y, z = view.direction
+    #     delta = new_index - index
+    #     view.switch_layer(delta)
+
+    # imgui.same_line()
+    
+    draw_list = imgui.get_window_draw_list()            
+    x, y = imgui.get_cursor_screen_pos()
+    draw_list.add_rect_filled(x, y, x+30, y+100, imgui.get_color_u32_rgba(0.5, 0.5, 0.5, 1))
+    top_layer = view.depth
+    h = 100 / top_layer
+    
+    for layer in view.hidden_layers:
+        dy = 100 - 100 * (layer + 1) / top_layer
+        draw_list.add_rect_filled(x, y+dy, x+30, y+dy+h, imgui.get_color_u32_rgba(0.5, 0.1, 0.1, 1))
+
+    dy = 100 - 100 * (index + 1) / top_layer
+    draw_list.add_rect_filled(x, y+dy, x+30, y+dy+h, imgui.get_color_u32_rgba(1, 1, 1, 0.5))
+            
 
 def render_menu(window):
 
