@@ -62,13 +62,13 @@ class DrawingView:
         pitch, yaw, roll = self.rotation
         self.rotation = (pitch + dx) % 4, (yaw + dy) % 4, (roll + dz) % 4
 
-    def set_cursor(self, x=None, y=None, z=None):
+    def set_cursor(self, x=None, y=None, z=None, set_layer_being_switched=True):
         print("set_cursor", x, y, z)
         x0, y0, z0 = self.cursor
         self.cursor = (x if x is not None else x0,
                        y if y is not None else y0,
                        z if z is not None else z0)
-        self.layer_being_switched = True
+        self.layer_being_switched = set_layer_being_switched
         
     def move_cursor(self, dx=0, dy=0, dz=0):
         "Move the cursor relative to current position."

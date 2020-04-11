@@ -21,9 +21,9 @@ class Tool(metaclass=abc.ABCMeta):
     tool = None  # Name of the tool (should correspond to an icon)
     ephemeral = False  # Ephemeral means we'll clear the layer before each draw call
     brush_preview = True  # Whether to show the current brush on top of the image while not drawing
-    show_rect = False
-    period = None
-    restore_last = False
+    show_rect = False  # Whether to display the borders of the tool's current rect
+    period = None  # Limit how fast the tool is updated
+    restore_last = False  # Whether to change back to the previous tool after one use of this one.
 
     def __init__(self, drawing: Drawing, brush, color, brush_color=None):
         self.drawing = drawing
@@ -272,6 +272,8 @@ class LayerPickerTool(Tool):
     brush_preview = False
 
     def start(self, view, point, buttons, modifiers):
+        self._prev_show_only_current_layer = view.show_only_current_layer
+        view.show_only_current_layer = True
         self._set_layer(view, point)
 
     def draw(self, view, point, buttons, modifiers):
@@ -279,6 +281,7 @@ class LayerPickerTool(Tool):
         
     def finish(self, view, point, buttons, modifiers):
         self._set_layer(view, point)
+        view.show_only_current_layer = self._prev_show_only_current_layer
 
     def _set_layer(self, view, point):
         # Find the layer under the cursor
@@ -295,4 +298,5 @@ class LayerPickerTool(Tool):
         sgn = sum(view.direction)
         offset = 1 if sgn < 0 else 0
         p = view.to_drawing_coord(x, y, z + offset)
-        view.set_cursor(*(None if i != view.axis else a for i, a in enumerate(p)))
+        view.set_cursor(*(None if i != view.axis else a for i, a in enumerate(p)),
+                        set_layer_being_switched=False)
