@@ -63,7 +63,6 @@ class DrawingView:
         self.rotation = (pitch + dx) % 4, (yaw + dy) % 4, (roll + dz) % 4
 
     def set_cursor(self, x=None, y=None, z=None, set_layer_being_switched=True):
-        print("set_cursor", x, y, z)
         x0, y0, z0 = self.cursor
         self.cursor = (x if x is not None else x0,
                        y if y is not None else y0,
