@@ -1,6 +1,7 @@
 Cython==0.29.14
 euclid3==0.1
 imgui==1.1.0
+numpy==1.18
 pluginbase==1.0.0
 pypng==0.0.20
 xdg==4.0.1
