@@ -1,6 +1,5 @@
 from functools import lru_cache
 from itertools import chain
-from time import time
 
 import numpy as np
 from pyglet import gl
@@ -10,6 +9,7 @@ from fogl.shader import Program, VertexShader, FragmentShader
 from fogl.texture import Texture, ByteTexture3D
 from fogl.vao import VertexArrayObject
 
+from .constants import Rx90, Ry90, Rz90
 from .texture import IntegerTexture
 
 
@@ -167,20 +167,6 @@ def _get_colors(colors):
 def make_translation(x, y, z):
     return np.matrix([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
  
-
-Rx90 = np.matrix([[1, 0, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, -1, 0, 0],
-                  [0, 0, 0, 1]])
-Ry90 = np.matrix([[0, 0, -1, 0],
-                  [0, 1, 0, 0],
-                  [1, 0, 0, 0],
-                  [0, 0, 0, 1]])
-Rz90 = np.matrix([[0, 1, 0, 0],
-                  [-1, 0, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]])
-
 
 @lru_cache(1)
 def _get_transform(rotation):

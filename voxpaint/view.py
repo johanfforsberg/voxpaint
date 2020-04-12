@@ -7,23 +7,10 @@ from euclid3 import Vector3
 import numpy as np
 
 from .brush import Brush, ImageBrush
+from .constants import Rx90, Ry90, Rz90
 from .draw import draw_line, draw_rectangle, blit
 from .rect import Rectangle
 from .util import AutoResetting
-
-
-Rx90 = np.matrix([[1, 0, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, -1, 0, 0],
-                  [0, 0, 0, 1]])
-Ry90 = np.matrix([[0, 0, -1, 0],
-                  [0, 1, 0, 0],
-                  [1, 0, 0, 0],
-                  [0, 0, 0, 1]])
-Rz90 = np.matrix([[0, 1, 0, 0],
-                  [-1, 0, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]])
 
 
 def make_translation(x, y, z):
