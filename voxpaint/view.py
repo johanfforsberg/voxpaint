@@ -1,7 +1,6 @@
 from functools import lru_cache
 import math
 from threading import RLock
-from time import time
 from typing import Tuple, Optional
 
 from euclid3 import Vector3
@@ -71,7 +70,6 @@ class DrawingView:
         
     def move_cursor(self, dx=0, dy=0, dz=0):
         "Move the cursor relative to current position."
-        print("move_cursor", dx, dy, dz)
         x, y, z = self.cursor
         w, h, d = self.drawing.data.shape
         self.cursor = (min(w-1, max(0, x + dx)),
@@ -343,11 +341,11 @@ class Overlay:
             self.dirty = rect.unite(self.dirty)
         return rect
 
-    def blit_brush(self, brush, p: Tuple[int, int], color: int=0):
+    def blit_brush(self, brush, p: Tuple[int, int], color: int=0, colorize: bool=False):
         x, y = p
         dx, dy = brush.center
         # dx, dy = 0, 0
-        data = brush.get_draw_data(color)
+        data = brush.get_draw_data(color, colorize)
         return self.blit(data, (int(x - dx), int(y - dy)))
 
     def blit(self, data: np.ndarray, p: Tuple[int, int]):
@@ -357,20 +355,20 @@ class Overlay:
         self.dirty = rect.unite(self.dirty)
         return rect
     
-    def draw_line(self, brush: Brush, p0: Tuple[int, int], p1: Tuple[int, int], color: int=0):
+    def draw_line(self, brush: Brush, p0: Tuple[int, int], p1: Tuple[int, int], color: int=0, colorize: bool=False):
         x0, y0 = p0
         x1, y1 = p1
         dx, dy = brush.center
-        data = brush.get_draw_data(color)
+        data = brush.get_draw_data(color, colorize)
         with self.lock:
             rect = draw_line(self.data, data, (int(x0-dx), int(y0-dy)), (int(x1-dx), int(y1-dy)))
         self.dirty = rect.unite(self.dirty)
         return rect
 
-    def draw_rectangle(self, brush: Brush, pos, size, color=0, fill=False):
+    def draw_rectangle(self, brush: Brush, pos, size, color=0, fill=False, colorize: bool=False):
         x, y = pos
         dx, dy = brush.center
-        data = brush.get_draw_data(color)
+        data = brush.get_draw_data(color, colorize)
         with self.lock:
             rect = draw_rectangle(self.data, data, (x-dx, y-dy), size, color + 2**24, fill)
         if rect:

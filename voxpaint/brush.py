@@ -18,17 +18,18 @@ class Brush:
         self.center = (w // 2, h // 2)
             
     @lru_cache(2)
-    def get_draw_data(self, color):
+    def get_draw_data(self, color, colorize=False):
         return np.clip(self.data, 0, 1) * color + 255 * 2**24
 
 
 class ImageBrush(Brush):
 
     @lru_cache(2)    
-    def get_draw_data(self, color):
-        filled = np.clip(self.data, 0, 1)
-        # TODO Fix this to be able to "erase" with other background colors than 0
-        if color > 0:
-            color = 1
-        return (self.data * color + filled * 2**24).astype(np.uint32)
-        
+    def get_draw_data(self, color, colorize=False):
+        filled_pixels = np.clip(self.data, 0, 1)     
+        if colorize:
+            # Fill all non-transparent pixels with the same color
+            return (color + filled_pixels * 2**24).astype(np.uint32)
+        else:
+            # Otiginal brush data
+            return (self.data + filled_pixels * 2**24).astype(np.uint32)
