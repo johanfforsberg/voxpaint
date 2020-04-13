@@ -452,10 +452,6 @@ def render_menu(window):
 
             imgui.separator()
             
-            if imgui.menu_item("Rotate up", "UP", False, True)[0]:
-                window.view.rotate(dx=-1)
-            if imgui.menu_item("Rotate down", "DOWN", False, True)[0]:
-                window.view.rotate(dx=1)
             if imgui.menu_item("Rotate left", "LEFT", False, True)[0]:
                 window.view.rotate(dz=-1)
             if imgui.menu_item("Rotate right", "RIGHT", False, True)[0]:
@@ -498,13 +494,26 @@ def render_menu(window):
 
         if imgui.begin_menu("Brush", window.drawing):
             drawing = window.drawing
+                        
+            if imgui.menu_item("Rotate clockwise", "", False, drawing.brush)[0]:
+                drawing.brush.rotate(1)
+            if imgui.menu_item("Rotate anti-clockwise", "", False, drawing.brush)[0]:
+                drawing.brush.rotate(-1)
+            if imgui.menu_item("Flip horizontally", "", False, drawing.brush)[0]:
+                drawing.brush.flip()
+            if imgui.menu_item("Flip vertically", "", False, drawing.brush)[0]:
+                drawing.brush.flip(True)
+
+            imgui.separator()
+
             for brush in drawing.brushes[-10:]:
                 clicked, active = imgui.menu_item(f"{brush.size}", "", brush == drawing.brush, True)
                 if clicked:
                     if brush == drawing.brush:
                         drawing.brushes.select(None)
                     else:
-                        drawing.brushes.select(brush)
+                        drawing.brushes.select(brush)            
+                
             imgui.end_menu()
 
         if imgui.begin_menu("Plugins", window.drawing):

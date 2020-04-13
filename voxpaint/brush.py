@@ -21,7 +21,19 @@ class Brush:
     def get_draw_data(self, color, colorize=False):
         return np.clip(self.data, 0, 1) * color + 255 * 2**24
 
+    def rotate(self, d):
+        data = self.data
+        self.data = np.rot90(data, d)
+        self.size = self.data.shape[:2]
+        self.get_draw_data.cache_clear()
 
+    def flip(self, vertical=False):
+        data = self.data
+        self.data = np.flip(data, axis=vertical)
+        self.size = self.data.shape[:2]
+        self.get_draw_data.cache_clear()
+        
+        
 class ImageBrush(Brush):
 
     @lru_cache(2)    
