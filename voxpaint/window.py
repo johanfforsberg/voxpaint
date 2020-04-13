@@ -446,8 +446,6 @@ class VoxpaintWindow(pyglet.window.Window):
         if not ask_for_path and drawing.path:
             drawing.save()
             self._add_recent_file(drawing.path)
-            # elif drawing.path.endswith(".png") and len(drawing.layers) == 1:
-            #     drawing.save_png()
         else:
             last_dir = self._get_latest_dir()
             # The point here is to not block the UI redraws while showing the
