@@ -78,12 +78,6 @@ class VoxpaintWindow(pyglet.window.Window):
              ((0, 0, 0),),
              ((0, 0, 0),),
              ((0, 0, 0),)])
-        self.tool_rect_vao = VertexArrayObject(vertices_class=SimpleVertices)        
-        self._tool_rect_vertices = self.tool_rect_vao.create_vertices(
-            [((0, 0, 0),),
-             ((0, 0, 0),),
-             ((0, 0, 0),),
-             ((0, 0, 0),)])
 
         self.tools = Selectable2({
             tool.tool: tool
@@ -382,19 +376,18 @@ class VoxpaintWindow(pyglet.window.Window):
             gl.glLineWidth(1)
             gl.glDrawArrays(gl.GL_LINE_LOOP, 0, 4)
 
-        if self.stroke_tool and self.stroke_tool.show_rect:
-            if self.stroke_tool.rect:
-                self._update_tool_rect(self.stroke_tool.rect)
-                with self.tool_rect_vao, self.line_program:
-                    gl.glUniformMatrix4fv(0, 1, gl.GL_FALSE, vm)
-                    gl.glUniform3f(1, 1., 1., 0.)
-                    gl.glLineWidth(1)
-                    gl.glDrawArrays(gl.GL_LINE_LOOP, 0, 4)            
-
     def _render_gui(self):
         w, h = self.get_size()
         
         imgui.new_frame()
+        
+        if self.stroke_tool and self.stroke_tool.show_rect:
+            if self.stroke_tool.rect:
+                rect = self.stroke_tool.rect
+                p0 = self._to_window_coords(*rect.topleft)
+                p1 = self._to_window_coords(*rect.bottomright)
+                ui.render_selection_rectangle(self, p0, p1)
+        
         with imgui.font(self._font):
             
             ui.render_menu(self)
@@ -555,7 +548,7 @@ class VoxpaintWindow(pyglet.window.Window):
                 del self.recent_files[f]
                 break
             
-    @lru_cache(1)
+    @lru_cache(3)
     def _to_image_coords(self, x: float, y: float) -> Tuple[float, float]:
         "Convert window coordinates to image coordinates."
         w, h, _ = self.view.shape
@@ -682,25 +675,6 @@ class VoxpaintWindow(pyglet.window.Window):
             ((xw0, yw1, 0),)
         ])
 
-    @lru_cache(1)
-    def _update_tool_rect(self, rect):
-        w, h = self.view.size
-        rw, rh = rect.size
-        x0, y0 = rect.position
-        x1, y1 = x0 + rw, y0 + rh
-        w2 = w / 2
-        h2 = h / 2
-        xw0 = (x0 - w2) / w
-        yw0 = (h2 - y0) / h
-        xw1 = (x1 - w2) / w
-        yw1 = (h2 - y1) / h
-        self._tool_rect_vertices.vertex_buffer.write([
-            ((xw0, yw0, 0),),
-            ((xw1, yw0, 0),),
-            ((xw1, yw1, 0),),
-            ((xw0, yw1, 0),)
-        ])
-        
         
 class OldpaintEventLoop(pyglet.app.EventLoop):
 

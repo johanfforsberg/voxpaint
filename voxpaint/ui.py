@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from functools import lru_cache
 from inspect import isclass
 from itertools import chain
@@ -638,4 +639,45 @@ def render_unsaved_exit(window):
             imgui.close_current_popup()
         imgui.end_popup()
             
+
+def render_selection_line(window, p0, p1):
+    with invisible_window(window):
+        imgui.text("hej")
+        x0, y0 = p0
+        x1, y1 = p1
+        draw_list = imgui.get_window_draw_list()
+        draw_list.add_line(x0, y0, x1, y1, imgui.get_color_u32_rgba(1, 1, 0, 1), 2)
+
+
+def render_selection_rectangle(window, p0, p1, color=(1, 1, 0, 1)):
+    with invisible_window(window):
+        w, h = window.get_size()
+        x0, y0 = p0
+        x1, y1 = p1
+        draw_list = imgui.get_window_draw_list()
+        draw_list.add_rect(int(x0), int(h - y0), int(x1), int(h - y1),
+                           imgui.get_color_u32_rgba(*color))
         
+
+@contextmanager
+def invisible_window(window):
+
+    "Draw a transparent imgui window on top of the drawing"
+    
+    w, h = window.get_size()
+    wx0, wy0 = window._to_window_coords(0, 0)
+    wx1, wy1 = window._to_window_coords(*window.drawing.size)
+    
+    imgui.set_next_window_size(wx1 - wx0, wy0 - wy1)
+    imgui.set_next_window_position(wx0, h - wy0)
+    imgui.set_next_window_bg_alpha(0)
+
+    with imgui.istyled(imgui.STYLE_WINDOW_ROUNDING, 0,
+                       imgui.STYLE_WINDOW_BORDERSIZE, 0,
+                       imgui.STYLE_WINDOW_PADDING, (0, 0)):
+        imgui.begin("selection point", False, flags=(imgui.WINDOW_NO_TITLE_BAR
+                                                     | imgui.WINDOW_NO_RESIZE
+                                                     | imgui.WINDOW_NO_MOVE
+                                                     | imgui.WINDOW_NO_INPUTS))
+        yield
+        imgui.end()
