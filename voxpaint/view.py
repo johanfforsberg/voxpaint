@@ -294,7 +294,9 @@ class DrawingView:
 
     def to_drawing_coord(self, x, y, z):
         "Return the given view point in drawing space."
-        return [int(x) for x in (self.untransform @ (x, y, z, 1)).getA1()][:3]
+        # Note: adding .5 to each dimension because we need to use pixel centers here.
+        # Otherwise there will be offset problems with rotation.
+        return [int(x) for x in (self.untransform @ (x + .5, y + .5, z + .5, 1)).getA1()][:3]
     
             
 class Overlay:

@@ -277,19 +277,18 @@ class LayerPickerTool(Tool):
     def start(self, view, point, buttons, modifiers):
         self._prev_show_only_current_layer = view.show_only_current_layer
         view.show_only_current_layer = True
-        self._set_layer(view, point)
+        self._set_layer(view, point, window.mouse.RIGHT & buttons)
 
     def draw(self, view, point, buttons, modifiers):
-        self._set_layer(view, point)
+        self._set_layer(view, point, window.mouse.RIGHT & buttons)
         
     def finish(self, view, point, buttons, modifiers):
-        self._set_layer(view, point)
+        self._set_layer(view, point, window.mouse.RIGHT & buttons)
         view.show_only_current_layer = self._prev_show_only_current_layer
 
-    def _set_layer(self, view, point):
+    def _set_layer(self, view, point, set_whole_cursor=False):
         # Find the layer under the cursor
-        layers = list(view.layers)
-        for z, layer in reversed(list(enumerate(layers))):
+        for z, layer in reversed(list(enumerate(view.layers))):
             color = layer[point]
             if color != 0:
                 break
@@ -297,9 +296,9 @@ class LayerPickerTool(Tool):
             # Clicked empty part, don't set cursor
             return
         x, y = point
-        # TODO this is pretty hacky, find a better way to fix indexing
-        sgn = sum(view.direction)
-        offset = 1 if sgn < 0 else 0
-        p = view.to_drawing_coord(x, y, z + offset)
-        view.set_cursor(*(None if i != view.axis else a for i, a in enumerate(p)),
-                        set_layer_being_switched=False)
+        p = view.to_drawing_coord(x, y, z)
+        if set_whole_cursor:
+            view.set_cursor(*p, set_layer_being_switched=False)
+        else:
+            filtered_point = (None if i != view.axis else a for i, a in enumerate(p))
+            view.set_cursor(*filtered_point, set_layer_being_switched=False)
