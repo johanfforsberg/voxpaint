@@ -384,6 +384,9 @@ def render_layers(view):
 
     dy = 100 - 100 * (index + 1) / top_layer
     draw_list.add_rect_filled(x, y+dy, x+30, y+dy+h, imgui.get_color_u32_rgba(1, 1, 1, 0.5))
+
+    imgui.set_cursor_screen_pos((x, y))
+    imgui.text(str(index))
             
 
 def render_menu(window):
@@ -414,6 +417,10 @@ def render_menu(window):
             clicked_save_as, selected_save = imgui.menu_item("Save as", None, False, window.drawing)
             if clicked_save_as:
                 window.save_drawing(ask_for_path=True)               
+
+            clicked_quit, selected_quit = imgui.menu_item("Quit", None, False)
+            if clicked_quit:
+                window.quit()
                 
             imgui.end_menu()
 

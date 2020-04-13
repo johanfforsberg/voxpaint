@@ -130,12 +130,13 @@ class LayersInsertEdit(Edit):
     version: int
     
     @classmethod
-    def create(cls, data, index, axis, n):
+    def create(cls, drawing, data, index, axis, n):
         return cls(
             index,
             axis,
             n,
             zlib.compress(data.tobytes()),
+            drawing.version
         )
 
     perform = LayersDeleteEdit.revert

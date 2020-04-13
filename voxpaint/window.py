@@ -337,7 +337,7 @@ class VoxpaintWindow(pyglet.window.Window):
         gl.glFinish()  # TODO This seems important; figure out why and if it's the best way.
 
     def on_close(self):
-        self._quit()
+        self.quit()
         
     def _render_view(self):
 
@@ -432,7 +432,7 @@ class VoxpaintWindow(pyglet.window.Window):
         data = imgui.get_draw_data()
         self.imgui_renderer.render(data)
 
-    def _quit(self):
+    def quit(self):
         unsaved = [d for d in self.drawings if d.unsaved]
         if unsaved:
             self.exit_unsaved_drawings = unsaved

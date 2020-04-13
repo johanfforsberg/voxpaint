@@ -54,7 +54,8 @@ class Drawing:
         self.hidden_layers_by_axis = (tuple(tuple(l) for l in hidden_layers)
                                       if hidden_layers
                                       else ((), (), ()))
-
+        self.cursor = (0, 0, 0)  # Position of the "current" layer in each dimension
+        
         self.undos = []
         self.redos = []
 
@@ -104,9 +105,33 @@ class Drawing:
         return masked_data
 
     def _update_hidden_layers(self, axis, hidden_layers):
+        "Properly update the hidden layers."
         hidden_layers_by_axis = list(self.hidden_layers_by_axis)
         hidden_layers_by_axis[axis] = tuple(sorted(hidden_layers))
         self.hidden_layers_by_axis = tuple(hidden_layers_by_axis)
+
+    def set_cursor(self, x=None, y=None, z=None):
+        "Set the cursor's absolute position."
+        x0, y0, z0 = self.cursor
+        self.cursor = (x if x is not None else x0,
+                       y if y is not None else y0,
+                       z if z is not None else z0)
+
+    def set_cursor_axis(self, axis, pos):
+        "Set only the given axis' component of the cursor."
+        self.set_cursor(*(pos if c == axis else None for c in range(3)))
+        
+    def move_cursor(self, dx=0, dy=0, dz=0):
+        "Move the cursor relative to current position."
+        x, y, z = self.cursor
+        w, h, d = self.data.shape
+        self.cursor = (min(w-1, max(0, x + dx)),
+                       min(h-1, max(0, y + dy)),
+                       min(d-1, max(0, z + dz)))
+
+    def move_cursor_axis(self, axis, delta):
+        "Move only the given axis' component of the cursor."
+        self.move_cursor(*(delta if c == axis else None for c in range(3)))
         
     @property
     def size(self):
@@ -224,7 +249,7 @@ class Drawing:
         # at the bottom in that case.
         shape = list(self.shape)
         shape[axis] = n       
-        edit = LayersInsertEdit.create(np.zeros(shape, dtype=np.uint8), index, axis, n)
+        edit = LayersInsertEdit.create(self, np.zeros(shape, dtype=np.uint8), index, axis, n)
         self._perform_edit(edit)
 
     def _really_insert_layers(self, data, index, axis, n):
@@ -237,6 +262,10 @@ class Drawing:
         lower_layers = (l for l in hidden_layers if l < index)
         upper_layers = (l + n for l in hidden_layers if l >= index)
         self._update_hidden_layers(axis, (*lower_layers, *upper_layers))
+
+        cursor = self.cursor[axis]
+        if cursor >= index + n:
+            self.move_cursor_axis(axis, n)
 
     def delete_layers(self, index, axis, n):
         edit = LayersDeleteEdit.create(self, index, axis, n)
@@ -251,6 +280,12 @@ class Drawing:
         lower_layers = (l for l in hidden_layers if l < index)
         upper_layers = (l - n for l in hidden_layers if l >= index + n)
         self._update_hidden_layers(axis, (*lower_layers, *upper_layers))
+        
+        cursor = self.cursor[axis]
+        if index <= cursor < index + n:
+            self.set_cursor_axis(axis, min(index, self.shape[axis]-1))
+        elif cursor >= index + n:
+            self.move_cursor_axis(axis, -n)
         
     def duplicate_layer(self, index, axis):
         edit = LayersInsertEdit.create(np.take(self.data, index, axis), index, axis, 1)

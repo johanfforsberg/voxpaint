@@ -36,7 +36,6 @@ class DrawingView:
     def __init__(self, drawing, rotation=(0, 0, 0)):
         self.drawing = drawing  # The underlying data
         self.rotation = rotation  # The transform
-        self.cursor = (0, 0, 0)  # Position of the "current" layer in each dimension
 
         self.offset = (0, 0)
         self.zoom = 2
@@ -48,21 +47,20 @@ class DrawingView:
         pitch, yaw, roll = self.rotation
         self.rotation = (pitch + dx) % 4, (yaw + dy) % 4, (roll + dz) % 4
 
+    @property
+    def cursor(self):
+        return self.drawing.cursor
+
     def set_cursor(self, x=None, y=None, z=None, set_layer_being_switched=True):
-        x0, y0, z0 = self.cursor
-        self.cursor = (x if x is not None else x0,
-                       y if y is not None else y0,
-                       z if z is not None else z0)
-        self.layer_being_switched = set_layer_being_switched
-        
-    def move_cursor(self, dx=0, dy=0, dz=0):
-        "Move the cursor relative to current position."
-        x, y, z = self.cursor
-        w, h, d = self.drawing.data.shape
-        self.cursor = (min(w-1, max(0, x + dx)),
-                       min(h-1, max(0, y + dy)),
-                       min(d-1, max(0, z + dz)))
-        
+        self.drawing.set_cursor(x, y, z)
+        if set_layer_being_switched:
+            self.layer_being_switched = True
+
+    def move_cursor(self, dx=0, dy=0, dz=0, set_layer_being_switched=True):
+        self.drawing.move_cursor(dx, dy, dz)
+        if set_layer_being_switched:
+            self.layer_being_switched = True
+            
     @property
     def data(self):
         return self._get_data(self.drawing.data.shape, self.rotation)
@@ -213,8 +211,15 @@ class DrawingView:
         self.drawing.delete_layers(index, self.axis, 1)
 
     def insert_layer(self, index=None):
-        index = self.layer_index if index is None else index
-        self.drawing.insert_layers(index, self.axis, 1)
+        direction = sum(a for a in self.direction if a > 0)
+        if direction:
+            index = self.layer_index + 1
+        else:
+            index = self.depth - self.layer_index - 1
+        if 0 <= index <= self.depth:
+            print(index)
+            self.drawing.insert_layers(index, self.axis, 1)
+            self.move_cursor(dz=direction)
 
     def duplicate_layer(self, index=None):
         index = self.layer_index if index is None else index
@@ -253,13 +258,13 @@ class DrawingView:
     @property
     def untransform(self):
         "This transform should take us from the view's space to the drawing's space."
-        return self._get_untransform(self.rotation)
+        return self._get_untransform(self.shape, self.drawing.data.shape, self.rotation)
 
     @lru_cache(1)
-    def _get_untransform(self, rotation):
-        w1, h1, d1 = self.shape
+    def _get_untransform(self, shape, drawing_shape, rotation):
+        w1, h1, d1 = shape
         T1 = make_translation(-w1 / 2, -h1 / 2, -d1 / 2)
-        w2, h2, d2 = self.drawing.data.shape
+        w2, h2, d2 = drawing_shape
         T2 = make_translation(w2 / 2, h2 / 2, d2 / 2)
         R = np.matrix(np.eye(4))
         rx, ry, rz = rotation
