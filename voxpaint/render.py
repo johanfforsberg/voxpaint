@@ -73,7 +73,7 @@ def render_view(window):
     draw_program = _get_program()
     empty_texture = _get_empty_texture(size)    
 
-    cursor_pos = d - view.layer_index - 1  # TODO why?
+    cursor_pos = d - view.index - 1  # TODO why?
 
     other_layer_alpha = 0.3 if view.show_only_current_layer or view.layer_being_switched else 1.0
 

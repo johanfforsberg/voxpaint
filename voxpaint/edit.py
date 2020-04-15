@@ -141,3 +141,46 @@ class LayersInsertEdit(Edit):
 
     perform = LayersDeleteEdit.revert
     revert = LayersDeleteEdit.perform
+
+
+@dataclass(frozen=True)
+class DrawingRotateEdit(Edit):
+
+    amount: int
+    axis: int
+    version: int
+
+    @classmethod
+    def create(cls, drawing, amount, axis):
+        return cls(
+            amount,
+            axis,
+            drawing.version
+        )
+    
+    def perform(self, drawing):
+        drawing._really_rotate(self.amount, self.axis)
+
+    def revert(self, drawing):
+        drawing._really_rotate(-self.amount, self.axis)
+        
+
+@dataclass(frozen=True)
+class DrawingFlipEdit(Edit):
+
+    axis: int
+    version: int
+
+    @classmethod
+    def create(cls, drawing, axis):
+        return cls(
+            axis,
+            drawing.version
+        )
+    
+    def perform(self, drawing):
+        drawing._really_flip(self.axis)
+
+    revert = perform
+        
+        

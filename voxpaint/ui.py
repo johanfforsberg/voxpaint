@@ -362,7 +362,7 @@ def render_layers(view):
 
     "Layer selector. Currently extremely spare."
 
-    index = view.layer_index
+    index = view.index
     # changed, new_index = imgui.v_slider_int("##layer_index", 30, 100, index,
     #                                         min_value=0, max_value=n_layers - 1)
     # if changed:
@@ -379,7 +379,7 @@ def render_layers(view):
     h = 100 / top_layer
     
     for layer in view.hidden_layers:
-        dy = 100 - 100 * (layer + 1) / top_layer
+        dy = 100 - 100 * (view.index_of_layer(layer) + 1) / top_layer
         draw_list.add_rect_filled(x, y+dy, x+30, y+dy+h, imgui.get_color_u32_rgba(0.5, 0.1, 0.1, 1))
 
     dy = 100 - 100 * (index + 1) / top_layer
@@ -439,6 +439,22 @@ def render_menu(window):
 
             if imgui.menu_item("Redo", "", False, window.drawing and window.drawing.redos)[0]:
                 window.drawing.redo()
+
+            imgui.separator()
+
+            if imgui.menu_item("Rotate clockwise", "", False, window.drawing)[0]:
+                window.view.rotate_drawing(1)
+
+            if imgui.menu_item("Rotate anti-clockwise", "", False, window.drawing)[0]:
+                window.view.rotate_drawing(-1)
+                
+            if imgui.menu_item("Flip horizontally", "", False, window.drawing)[0]:
+                window.view.flip_drawing()
+
+            if imgui.menu_item("Flip vertically", "", False, window.drawing)[0]:
+                window.view.flip_drawing(vertically=True)
+                
+            imgui.separator()
                 
             if window.drawings:
                 imgui.separator()
@@ -471,10 +487,10 @@ def render_menu(window):
             
         if imgui.begin_menu("Layer", window.drawing):
 
-            if imgui.menu_item("Next layer", "w", False, window.view.layer_index < window.view.depth - 1)[0]:
+            if imgui.menu_item("Next layer", "w", False, window.view.index < window.view.depth - 1)[0]:
                 window.view.next_layer()
 
-            if imgui.menu_item("Previous layer", "s", False, window.view.layer_index > 0)[0]:
+            if imgui.menu_item("Previous layer", "s", False, window.view.index > 0)[0]:
                 window.view.prev_layer()
 
             if imgui.menu_item("Toggle layer visibility", "", False, True)[0]:
@@ -482,10 +498,10 @@ def render_menu(window):
                 
             imgui.separator()
             
-            if imgui.menu_item("Move layer up", "W", False, window.view.layer_index < window.view.depth - 1)[0]:
+            if imgui.menu_item("Move layer up", "W", False, window.view.index < window.view.depth - 1)[0]:
                 window.view.move_layer(+1)
 
-            if imgui.menu_item("Move layer down", "S", False, window.view.layer_index > 0)[0]:
+            if imgui.menu_item("Move layer down", "S", False, window.view.index > 0)[0]:
                 window.view.move_layer(-1)
 
             if imgui.menu_item("Delete layer", "", False, True)[0]:
@@ -550,7 +566,7 @@ def render_menu(window):
             if window.mouse_position:
                 imgui.set_cursor_screen_pos((w - 150, 0))
                 x, y = window._to_image_coords(*window.mouse_position)
-                imgui.text(f"{int(x): >3},{int(y): >3},{window.view.layer_index: >3}")
+                imgui.text(f"{int(x): >3},{int(y): >3},{window.view.index: >3}")
 
         imgui.end_main_menu_bar()                
 

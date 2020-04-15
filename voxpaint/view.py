@@ -1,4 +1,5 @@
 from functools import lru_cache
+from itertools import chain
 import math
 from threading import RLock
 from typing import Tuple, Optional
@@ -101,7 +102,7 @@ class DrawingView:
         """
         Return a vector pointing in the positive direction of the current view.
         That means the direction in which the layer structure is stacked,
-        i.e. "up". The "layer_index" tells where along this axis the cursor is.
+        i.e. "up". The "index" tells where along this axis the cursor is.
         """
         # TODO This is pretty crude. Also, use numpy instead of euclid?
         rx, ry, rz = rotation
@@ -130,12 +131,13 @@ class DrawingView:
         return self.data.shape[2]    
     
     @property
-    def layer_index(self):
+    def index(self):
         "The depth of the current layer index as seen from the user."
-        return self._get_layer_index(self.direction, self.data.shape, self.cursor)
+        return self._get_index(self.direction, self.data.shape, self.cursor)
 
     @lru_cache(1)
-    def _get_layer_index(self, direction, shape, cursor):
+    def _get_index(self, direction, shape, cursor):
+        self._get_index
         x, y, z = direction
         d = shape[2]
         cx, cy, cz = cursor
@@ -145,9 +147,15 @@ class DrawingView:
             return cy if y == 1 else d - cy - 1
         if z:
             return cz if z == 1 else d - cz - 1        
+
+    def index_of_layer(self, layer_i):
+        if self.direction[self.axis] > 0:
+            return layer_i
+        else:
+            return self.depth - 1 - layer_i
         
     def layer(self, index: int=None):
-        index = index if index is not None else self.layer_index
+        index = index if index is not None else self.index
         return self.data[:, :, index]
 
     @property
@@ -165,10 +173,20 @@ class DrawingView:
     @lru_cache(3)
     def _get_overlay(self, size: Tuple[int, int]):
         return Overlay(size)
-
+    
     def modify(self, slc3: Tuple[slice, slice, slice], data, tool):
         self.drawing.modify(slc3, data, self.rotation, tool)
 
+    def rotate_drawing(self, amount, axis=None):
+        axis = axis if axis is not None else self.axis
+        self.drawing.rotate(amount, axis)
+
+    def flip_drawing(self, vertically=False):
+        a1, a2 = self.axes
+        for _ in range(self.rotation[self.axis]):
+            a1, a2 = a2, a1
+        self.drawing.flip((a1, a2)[vertically])
+        
     def next_layer(self):
         self.switch_layer(1)
 
@@ -186,43 +204,49 @@ class DrawingView:
         self.drawing.modify(drawing_slice, self._unrotate_array(data, self.rotation), tool)
                 
     def move_layer(self, d: int):
-        from_index = self.layer_index
+        from_index = self.index
         to_index = from_index + d
         depth = self.data.shape[2]
         if (from_index != to_index) and (0 <= from_index < depth) and (0 <= to_index < depth):
-            # rect = Rectangle(size=self.size)
-            # slc1 = self.to_drawing_slice(rect, from_index)
-            # slc2 = self.to_drawing_slice(rect, to_index)
             self.drawing.move_layer(from_index, to_index, self.axis)
             deltas = [d * a for a in self.direction]
             self.move_cursor(*deltas)
 
     @property
     def axis(self):
+        "The 'depth' axis."
         return self._get_axis(self.direction)
     
     @lru_cache(1)
     def _get_axis(self, direction):
         return [abs(d) for d in direction].index(1)  # TODO this is stupid
-            
+
+    @property
+    def axes(self):
+        "The two axes defining the 'plane' of the view."
+        return self._get_axes(self.direction)
+
+    @lru_cache(1)
+    def _get_axes(self, direction):
+        return tuple(chain(range(self.axis), range(self.axis + 1, 3)))
+        
     def delete_layer(self, index=None):
-        index = self.layer_index if index is None else index
+        index = self.index if index is None else index
         
         self.drawing.delete_layers(index, self.axis, 1)
 
     def insert_layer(self, index=None):
         direction = sum(a for a in self.direction if a > 0)
         if direction:
-            index = self.layer_index + 1
+            index = self.index + 1
         else:
-            index = self.depth - self.layer_index - 1
+            index = self.depth - self.index - 1
         if 0 <= index <= self.depth:
-            print(index)
             self.drawing.insert_layers(index, self.axis, 1)
             self.move_cursor(dz=direction)
 
     def duplicate_layer(self, index=None):
-        index = self.layer_index if index is None else index
+        index = self.index if index is None else index
         self.drawing.duplicate_layer(index, self.axis)
 
     @property
@@ -230,18 +254,18 @@ class DrawingView:
         return self.drawing.hidden_layers_by_axis[self.axis]
         
     def hide_layer(self, index=None):
-        index = self.layer_index if index is None else index
+        index = self.cursor[self.axis] if index is None else index
         self.drawing.hide_layer(index, self.axis)
 
     def show_layer(self, index=None):
-        index = self.layer_index if index is None else index
+        index = self.cursor[self.axis] if index is None else index
         self.drawing.show_layer(index, self.axis)
 
     def layer_visible(self, index=None):
         return self.drawing.layer_visible(index, self.axis)
         
     def toggle_layer(self, index=None):
-        index = self.layer_index if index is None else index
+        index = self.cursor[self.axis] if index is None else index
         if self.layer_visible(index):
             self.hide_layer(index)
         else:
@@ -285,7 +309,7 @@ class DrawingView:
         x0, y0 = rect.topleft
         x1, y1 = rect.bottomright
 
-        index = self.layer_index if index is None else index
+        index = self.index if index is None else index
         topleft = np.array([x0, y0, index, 1])
         bottomright = np.array([x1, y1, index+1, 1])
 

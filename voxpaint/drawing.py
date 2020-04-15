@@ -7,7 +7,8 @@ from uuid import uuid4
 import numpy as np
 import png
 
-from .edit import LayerEdit, PaletteEdit, LayerSwapEdit, LayersDeleteEdit, LayersInsertEdit
+from .edit import (LayerEdit, PaletteEdit, LayerSwapEdit, LayersDeleteEdit, LayersInsertEdit,
+                   DrawingRotateEdit, DrawingFlipEdit)
 from .ora import load_ora, save_ora
 from .palette import Palette
 from .rect import Rectangle
@@ -109,6 +110,7 @@ class Drawing:
         hidden_layers_by_axis = list(self.hidden_layers_by_axis)
         hidden_layers_by_axis[axis] = tuple(sorted(hidden_layers))
         self.hidden_layers_by_axis = tuple(hidden_layers_by_axis)
+        self._get_masked_data.cache_clear()
 
     def set_cursor(self, x=None, y=None, z=None):
         "Set the cursor's absolute position."
@@ -213,6 +215,36 @@ class Drawing:
         edit = LayerEdit.create(self, slc, data, tool)
         self._perform_edit(edit)
 
+    def rotate(self, amount, axis):
+        edit = DrawingRotateEdit.create(self, amount, axis)
+        self._perform_edit(edit)        
+        
+    def _really_rotate(self, amount, axis):
+        axes = aa, ab = (0, 1, 2)[:axis] + (0, 1, 2)[axis + 1:]
+        self._data = np.rot90(self._data, amount, axes)
+
+        la, lb = self.hidden_layers_by_axis[:axis] + self.hidden_layers_by_axis[axis + 1:]
+        sa, sb = self.shape[:axis] + self.shape[axis+1:]
+        if amount > 0:
+            for i in range(amount):
+                (sb, lb), (sa, la) = (sa, la), (sb, tuple(sb - 1 - i for i in lb))
+        else:
+            for i in range(-amount):
+                (sb, lb), (sa, la) = (sa, tuple(sa - 1 - i for i in la)), (sb, lb)
+        self._update_hidden_layers(aa, la)
+        self._update_hidden_layers(ab, lb)
+
+    def flip(self, axis):
+        edit = DrawingFlipEdit.create(self, axis)
+        self._perform_edit(edit)
+        
+    def _really_flip(self, axis):
+        self._data = np.flip(self._data, axis)
+
+        hidden_layers = self.hidden_layers_by_axis[axis]
+        size = self.shape[axis]
+        self._update_hidden_layers(axis, (size - 1 - i for i in hidden_layers))
+        
     def change_colors(self, start_i, *colors):
         orig_colors = self.palette._colors[start_i:start_i+len(colors)]
         edit = PaletteEdit.create(self, start_i, orig_colors, colors)
